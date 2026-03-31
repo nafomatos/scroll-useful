@@ -113,7 +113,7 @@ ${numbered}`;
   let msg;
   try {
     msg = await claude.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }],
     });
@@ -156,7 +156,7 @@ module.exports = async function handler(req, res) {
   }
 
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
+  res.setHeader('Cache-Control', 's-maxage=7200, stale-while-revalidate=600');
 
   try {
     // 1. Fetch all RSS feeds in parallel
