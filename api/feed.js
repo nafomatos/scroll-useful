@@ -63,8 +63,8 @@ async function fetchTopicArticles(topic) {
   return [en, pt].filter(Boolean);
 }
 
-// Scrape and extract article text via Readability, capped at MAX_TEXT_CHARS.
-async function scrapeText(url) {
+// Scrape article text and og:image thumbnail in one fetch.
+async function scrapeArticle(url) {
   try {
     const res = await fetch(url, {
       headers: {
@@ -76,19 +76,32 @@ async function scrapeText(url) {
       signal: AbortSignal.timeout(SCRAPE_TIMEOUT_MS),
     });
 
-    if (!res.ok) return '';
+    if (!res.ok) return { text: '', thumbnail: null };
     const html = await res.text();
 
-    // Use the resolved URL for JSDOM so relative links parse correctly
     const finalUrl = res.url || url;
     const dom = new JSDOM(html, { url: finalUrl });
-    const reader = new Readability(dom.window.document);
-    const article = reader.parse();
-    if (!article || !article.textContent) return '';
+    const doc = dom.window.document;
 
-    return article.textContent.replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT_CHARS);
+    // Extract og:image and resolve to absolute URL
+    let thumbnail = null;
+    const ogImg =
+      doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
+      doc.querySelector('meta[name="og:image"]')?.getAttribute('content') ||
+      doc.querySelector('meta[property="twitter:image"]')?.getAttribute('content');
+    if (ogImg) {
+      try { thumbnail = new URL(ogImg, finalUrl).href; } catch { /* ignore */ }
+    }
+
+    const reader = new Readability(doc);
+    const article = reader.parse();
+    const text = article?.textContent
+      ? article.textContent.replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT_CHARS)
+      : '';
+
+    return { text, thumbnail };
   } catch {
-    return '';
+    return { text: '', thumbnail: null };
   }
 }
 
@@ -167,11 +180,12 @@ module.exports = async function handler(req, res) {
       return res.status(502).json({ error: 'No articles fetched from RSS feeds.' });
     }
 
-    // 2. Scrape article text in parallel (failures return empty string)
-    const texts = await Promise.allSettled(articles.map((a) => scrapeText(a.link)));
+    // 2. Scrape article text + thumbnail in parallel
+    const scraped = await Promise.allSettled(articles.map((a) => scrapeArticle(a.link)));
     const articlesWithText = articles.map((a, i) => ({
       ...a,
-      text: texts[i].status === 'fulfilled' ? texts[i].value : '',
+      text:      scraped[i].status === 'fulfilled' ? scraped[i].value.text      : '',
+      thumbnail: scraped[i].status === 'fulfilled' ? scraped[i].value.thumbnail : null,
     }));
 
     // 3. Single Claude call for all summaries
@@ -188,6 +202,7 @@ module.exports = async function handler(req, res) {
       source: a.source,
       link: a.link,
       pubDate: a.pubDate,
+      thumbnail: a.thumbnail || null,
       saved: false,
     }));
 

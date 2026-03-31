@@ -156,6 +156,8 @@
       border-radius: 6px;
     }
     @keyframes shimmer { to { background-position: -200% 0; } }
+    .skel-img  { width: 100%; height: 200px; border-radius: 0; margin-bottom: 0; }
+    .skel-body { padding: 14px 16px 13px; }
     .skel-tag  { width: 64px; height: 22px; margin-bottom: 14px; border-radius: 20px; }
     .skel-h1   { width: 90%; height: 18px; margin-bottom: 8px; }
     .skel-h2   { width: 70%; height: 18px; margin-bottom: 16px; }
@@ -168,10 +170,11 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 18px 18px 14px;
+      padding: 0;
       margin-bottom: 12px;
       cursor: pointer;
       position: relative;
+      overflow: hidden;
       opacity: 0;
       transform: translateY(18px);
       transition:
@@ -185,9 +188,26 @@
       opacity: 1;
       transform: translateY(0);
     }
-    .card:active {
-      background: #16161a;
-      border-color: #2a2a30;
+    .card:active { border-color: #2a2a30; }
+    .card:active .card-body { background: #16161a; }
+
+    /* thumbnail */
+    .card-thumbnail {
+      display: block;
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      border-radius: 0;
+      /* subtle fade-in as image loads */
+      opacity: 0;
+      transition: opacity .3s ease;
+    }
+    .card-thumbnail.loaded { opacity: 1; }
+
+    /* content wrapper */
+    .card-body {
+      padding: 14px 16px 13px;
+      transition: background .2s;
     }
 
     /* top row */
@@ -452,23 +472,37 @@ function buildCard(card) {
   el.className = `card tag-${slug}`;
   el.dataset.id = card.id;
 
+  const thumbHTML = card.thumbnail
+    ? `<img class="card-thumbnail" src="${card.thumbnail}" alt="" loading="lazy" decoding="async">`
+    : '';
+
   el.innerHTML = `
-    <div class="card-top">
-      <span class="topic-tag">${card.topic}</span>
-      <button class="save-btn ${saved ? 'saved' : ''}" data-id="${card.id}" aria-label="${saved ? 'Unsave' : 'Save'}">
-        ${saved ? BOOKMARK_FILLED : BOOKMARK_EMPTY}
-      </button>
-    </div>
-    <h2 class="card-headline">${card.headline}</h2>
-    <p class="card-summary">${card.summary}</p>
-    <div class="card-bottom">
-      <div class="card-meta">
-        <span>${card.source}</span>
-        ${card.pubDate ? `<span class="dot"></span><span>${timeAgo(card.pubDate)}</span>` : ''}
+    ${thumbHTML}
+    <div class="card-body">
+      <div class="card-top">
+        <span class="topic-tag">${card.topic}</span>
+        <button class="save-btn ${saved ? 'saved' : ''}" data-id="${card.id}" aria-label="${saved ? 'Unsave' : 'Save'}">
+          ${saved ? BOOKMARK_FILLED : BOOKMARK_EMPTY}
+        </button>
       </div>
-      <a class="read-link" href="${card.link}" target="_blank" rel="noopener" aria-label="Read article">Read ${ARROW_SVG}</a>
+      <h2 class="card-headline">${card.headline}</h2>
+      <p class="card-summary">${card.summary}</p>
+      <div class="card-bottom">
+        <div class="card-meta">
+          <span>${card.source}</span>
+          ${card.pubDate ? `<span class="dot"></span><span>${timeAgo(card.pubDate)}</span>` : ''}
+        </div>
+        <a class="read-link" href="${card.link}" target="_blank" rel="noopener" aria-label="Read article">Read ${ARROW_SVG}</a>
+      </div>
     </div>
   `;
+
+  // Fade image in once loaded; hide on error
+  if (card.thumbnail) {
+    const img = el.querySelector('.card-thumbnail');
+    img.addEventListener('load', () => img.classList.add('loaded'));
+    img.addEventListener('error', () => img.style.display = 'none');
+  }
 
   // save button (stop propagation so card click doesn't also fire)
   el.querySelector('.save-btn').addEventListener('click', async e => {
@@ -494,14 +528,17 @@ function buildCard(card) {
 }
 
 function skeletonHTML() {
-  return Array.from({ length: 5 }, () => `
+  return Array.from({ length: 5 }, (_, i) => `
     <div class="skeleton-card">
-      <div class="skel skel-tag"></div>
-      <div class="skel skel-h1"></div>
-      <div class="skel skel-h2"></div>
-      <div class="skel skel-p1"></div>
-      <div class="skel skel-p2"></div>
-      <div class="skel skel-p3"></div>
+      ${i % 2 === 0 ? '<div class="skel skel-img"></div>' : ''}
+      <div class="skel-body">
+        <div class="skel skel-tag"></div>
+        <div class="skel skel-h1"></div>
+        <div class="skel skel-h2"></div>
+        <div class="skel skel-p1"></div>
+        <div class="skel skel-p2"></div>
+        <div class="skel skel-p3"></div>
+      </div>
     </div>
   `).join('');
 }
