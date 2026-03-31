@@ -14,9 +14,12 @@ const SCRAPE_TIMEOUT_MS = 7000;
 const rssParser = new Parser({ timeout: 8000 });
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 });
 
-// Google News RSS for a topic
-function rssUrl(topic) {
+// Google News RSS URLs — one English (US), one Portuguese (BR)
+function rssUrlEN(topic) {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}&hl=en-US&gl=US&ceid=US:en`;
+}
+function rssUrlPT(topic) {
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}&hl=pt-BR&gl=BR&ceid=BR:pt`;
 }
 
 // Google News titles are "Headline - Publisher". Strip the publisher suffix.
@@ -35,21 +38,29 @@ function extractSource(item) {
   }
 }
 
-// Fetch RSS and return up to MAX_PER_TOPIC articles for a topic.
+// Fetch one article from EN feed and one from PT feed for a topic.
 async function fetchTopicArticles(topic) {
-  try {
-    const feed = await rssParser.parseURL(rssUrl(topic));
-    return feed.items.slice(0, MAX_PER_TOPIC).map((item) => ({
-      topic,
-      headline: cleanHeadline(item.title),
-      link: item.link,
-      source: extractSource(item),
-      pubDate: item.pubDate || item.isoDate || null,
-    }));
-  } catch (err) {
-    console.warn(`RSS fetch failed for "${topic}":`, err.message);
-    return [];
-  }
+  const fetchOne = async (url, lang) => {
+    try {
+      const feed = await rssParser.parseURL(url);
+      const item = feed.items[0];
+      if (!item) return null;
+      return {
+        topic,
+        lang,
+        headline: cleanHeadline(item.title),
+        link: item.link,
+        source: extractSource(item),
+        pubDate: item.pubDate || item.isoDate || null,
+      };
+    } catch (err) {
+      console.warn(`RSS fetch failed for "${topic}" (${lang}):`, err.message);
+      return null;
+    }
+  };
+
+  const [en, pt] = await Promise.all([fetchOne(rssUrlEN(topic), 'en'), fetchOne(rssUrlPT(topic), 'pt')]);
+  return [en, pt].filter(Boolean);
 }
 
 // Scrape and extract article text via Readability, capped at MAX_TEXT_CHARS.
@@ -90,7 +101,7 @@ async function summariseAll(articles) {
     )
     .join('\n\n---\n\n');
 
-  const prompt = `You are a sharp, concise news editor. For each article below write a 2-3 sentence summary that captures the key facts and why it matters.
+  const prompt = `You are a sharp, concise news editor. For each article below write a 2-3 sentence summary in ENGLISH that captures the key facts and why it matters. Even if the article is in Portuguese, write the summary in English.
 
 Return ONLY a valid JSON array — no markdown fences, no extra keys — in this exact shape:
 [{"id":0,"summary":"..."},{"id":1,"summary":"..."},...]
@@ -99,11 +110,26 @@ Articles:
 
 ${numbered}`;
 
-  const msg = await claude.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 4096,
-    messages: [{ role: 'user', content: prompt }],
-  });
+  let msg;
+  try {
+    msg = await claude.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: prompt }],
+    });
+  } catch (err) {
+    // Fall back to Haiku if Sonnet is overloaded (529) or rate-limited (429)
+    if (err.status === 529 || err.status === 429) {
+      console.warn('Sonnet overloaded, falling back to Haiku');
+      msg = await claude.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 4096,
+        messages: [{ role: 'user', content: prompt }],
+      });
+    } else {
+      throw err;
+    }
+  }
 
   const raw = (msg.content[0]?.text || '').trim();
 
