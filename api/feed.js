@@ -12,7 +12,7 @@ const MAX_TEXT_CHARS = 1500;
 const SCRAPE_TIMEOUT_MS = 7000;
 
 const rssParser = new Parser({ timeout: 8000 });
-const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 });
 
 // Google News RSS for a topic
 function rssUrl(topic) {
