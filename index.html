@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#080808">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Pulse">
+  <link rel="manifest" href="/manifest.json">
+  <title>Pulse</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080808;
+      --surface:   #111114;
+      --border:    #1f1f23;
+      --text:      #f0f0f0;
+      --muted:     #888;
+      --accent:    #fff;
+      --radius:    18px;
+      --safe-top:  env(safe-area-inset-top, 0px);
+      --safe-bot:  env(safe-area-inset-bottom, 0px);
+    }
+
+    /* Topic palette */
+    .tag-tech      { --tc:#60a5fa; --tb:rgba(96,165,250,.12); }
+    .tag-startups  { --tc:#a78bfa; --tb:rgba(167,139,250,.12); }
+    .tag-science   { --tc:#34d399; --tb:rgba(52,211,153,.12); }
+    .tag-design    { --tc:#fbbf24; --tb:rgba(251,191,36,.12); }
+    .tag-finance   { --tc:#22d3ee; --tb:rgba(34,211,238,.12); }
+    .tag-culture   { --tc:#fb7185; --tb:rgba(251,113,133,.12); }
+    .tag-sports    { --tc:#a3e635; --tb:rgba(163,230,53,.12); }
+
+    html { background: var(--bg); }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      overscroll-behavior-y: contain;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ────────────────────────────────── */
+    #header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: calc(var(--safe-top) + 14px) 20px 0;
+      background: rgba(8,8,8,.85);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    #header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    #logo {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #fff 40%, #888);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    #refresh-btn {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: color .2s, transform .4s;
+      flex-shrink: 0;
+    }
+    #refresh-btn:active { transform: rotate(180deg); }
+    #refresh-btn.spinning svg { animation: spin .7s linear infinite; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Tabs ──────────────────────────────────── */
+    #tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 8px 0 10px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-align: center;
+      cursor: pointer;
+      border: none;
+      background: none;
+      position: relative;
+      transition: color .2s;
+      border-bottom: 2px solid transparent;
+      letter-spacing: .01em;
+    }
+    .tab.active {
+      color: var(--text);
+      border-bottom-color: var(--text);
+    }
+    .tab .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 9px;
+      background: var(--border);
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      margin-left: 5px;
+      vertical-align: middle;
+      transition: background .2s, color .2s;
+    }
+    .tab.active .badge { background: var(--text); color: var(--bg); }
+
+    /* ── Feed ──────────────────────────────────── */
+    .feed-page {
+      padding: 16px 16px calc(24px + var(--safe-bot));
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .feed-page.hidden { display: none; }
+
+    /* ── Skeleton ──────────────────────────────── */
+    .skeleton-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 12px;
+    }
+    .skel {
+      background: linear-gradient(90deg, #1f1f23 25%, #2a2a2e 50%, #1f1f23 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 6px;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+    .skel-tag  { width: 64px; height: 22px; margin-bottom: 14px; border-radius: 20px; }
+    .skel-h1   { width: 90%; height: 18px; margin-bottom: 8px; }
+    .skel-h2   { width: 70%; height: 18px; margin-bottom: 16px; }
+    .skel-p1   { width: 100%; height: 13px; margin-bottom: 6px; }
+    .skel-p2   { width: 85%;  height: 13px; margin-bottom: 6px; }
+    .skel-p3   { width: 55%;  height: 13px; }
+
+    /* ── Card ──────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 18px 14px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      position: relative;
+      opacity: 0;
+      transform: translateY(18px);
+      transition:
+        opacity .35s ease,
+        transform .35s ease,
+        border-color .2s,
+        background .2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .card:active {
+      background: #16161a;
+      border-color: #2a2a30;
+    }
+
+    /* top row */
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .topic-tag {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: var(--tb);
+      color: var(--tc);
+      border: 1px solid color-mix(in srgb, var(--tc) 20%, transparent);
+    }
+
+    .save-btn {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: color .2s, background .2s, border-color .2s, transform .15s;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .save-btn:active { transform: scale(.88); }
+    .save-btn.saved {
+      color: #fbbf24;
+      background: rgba(251,191,36,.1);
+      border-color: rgba(251,191,36,.3);
+    }
+    .save-btn svg { width: 15px; height: 15px; }
+
+    /* headline */
+    .card-headline {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.35;
+      color: var(--text);
+      margin-bottom: 9px;
+      letter-spacing: -.01em;
+    }
+
+    /* summary */
+    .card-summary {
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: #aaa;
+      margin-bottom: 14px;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* bottom */
+    .card-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-meta {
+      font-size: 11.5px;
+      color: var(--muted);
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-meta .dot {
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: #444;
+      flex-shrink: 0;
+    }
+
+    .read-link {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--muted);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      transition: color .2s;
+      padding: 4px 0 4px 8px;
+    }
+    .read-link:hover { color: var(--text); }
+    .read-link svg { width: 12px; height: 12px; }
+
+    /* ── Empty saved ───────────────────────────── */
+    #empty-saved {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 32px;
+      gap: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+    #empty-saved svg { opacity: .25; }
+    #empty-saved p { font-size: 14px; line-height: 1.5; }
+
+    /* ── Error ─────────────────────────────────── */
+    #error-banner {
+      display: none;
+      margin: 16px 16px 0;
+      padding: 14px 16px;
+      background: rgba(239,68,68,.1);
+      border: 1px solid rgba(239,68,68,.25);
+      border-radius: 12px;
+      font-size: 13px;
+      color: #f87171;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #error-banner.hidden { display: none; }
+    #error-banner button {
+      margin-left: auto;
+      background: rgba(239,68,68,.2);
+      border: none;
+      border-radius: 8px;
+      color: #f87171;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* ── Pull-to-refresh hint ───────────────────── */
+    #ptr {
+      text-align: center;
+      font-size: 11px;
+      color: #333;
+      padding: 10px;
+      letter-spacing: .04em;
+    }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 0; }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <div id="header-top">
+    <div id="logo">Pulse</div>
+    <button id="refresh-btn" aria-label="Refresh">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+      </svg>
+    </button>
+  </div>
+  <div id="tabs">
+    <button class="tab active" data-tab="feed">Feed <span class="badge" id="feed-count">—</span></button>
+    <button class="tab" data-tab="saved">Saved <span class="badge" id="saved-count">0</span></button>
+  </div>
+</div>
+
+<div id="error-banner" class="hidden">
+  <span id="error-msg">Failed to load feed.</span>
+  <button id="retry-btn">Retry</button>
+</div>
+
+<div id="feed-page" class="feed-page">
+  <!-- cards rendered here -->
+</div>
+
+<div id="saved-page" class="feed-page hidden">
+  <!-- saved cards rendered here -->
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// IndexedDB
+// ─────────────────────────────────────────────
+const DB_NAME = 'pulse-db', DB_VER = 1, STORE = 'saved';
+let db = null;
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, DB_VER);
+    r.onupgradeneeded = e => e.target.result.createObjectStore(STORE, { keyPath: 'id' });
+    r.onsuccess = e => res(e.target.result);
+    r.onerror = e => rej(e.target.error);
+  });
+}
+
+function dbGetAll() {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const r = tx.objectStore(STORE).getAll();
+    r.onsuccess = e => res(e.target.result);
+    r.onerror = e => rej(e.target.error);
+  });
+}
+
+function dbPut(card) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(card);
+    tx.oncomplete = () => res();
+    tx.onerror = e => rej(e.target.error);
+  });
+}
+
+function dbDelete(id) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(id);
+    tx.oncomplete = () => res();
+    tx.onerror = e => rej(e.target.error);
+  });
+}
+
+// ─────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────
+let feedCards = [];
+let savedIds = new Set();
+let activeTab = 'feed';
+
+// ─────────────────────────────────────────────
+// Utils
+// ─────────────────────────────────────────────
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+const BOOKMARK_EMPTY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>`;
+const BOOKMARK_FILLED = `<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>`;
+const ARROW_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
+
+// ─────────────────────────────────────────────
+// Render
+// ─────────────────────────────────────────────
+function buildCard(card) {
+  const saved = savedIds.has(card.id);
+  const slug = (card.topic || '').toLowerCase().replace(/\s+/g, '-');
+
+  const el = document.createElement('article');
+  el.className = `card tag-${slug}`;
+  el.dataset.id = card.id;
+
+  el.innerHTML = `
+    <div class="card-top">
+      <span class="topic-tag">${card.topic}</span>
+      <button class="save-btn ${saved ? 'saved' : ''}" data-id="${card.id}" aria-label="${saved ? 'Unsave' : 'Save'}">
+        ${saved ? BOOKMARK_FILLED : BOOKMARK_EMPTY}
+      </button>
+    </div>
+    <h2 class="card-headline">${card.headline}</h2>
+    <p class="card-summary">${card.summary}</p>
+    <div class="card-bottom">
+      <div class="card-meta">
+        <span>${card.source}</span>
+        ${card.pubDate ? `<span class="dot"></span><span>${timeAgo(card.pubDate)}</span>` : ''}
+      </div>
+      <a class="read-link" href="${card.link}" target="_blank" rel="noopener" aria-label="Read article">Read ${ARROW_SVG}</a>
+    </div>
+  `;
+
+  // save button (stop propagation so card click doesn't also fire)
+  el.querySelector('.save-btn').addEventListener('click', async e => {
+    e.stopPropagation();
+    await toggleSave(card);
+    // update button in place without full re-render
+    const btn = e.currentTarget;
+    const isSaved = savedIds.has(card.id);
+    btn.innerHTML = isSaved ? BOOKMARK_FILLED : BOOKMARK_EMPTY;
+    btn.classList.toggle('saved', isSaved);
+    btn.setAttribute('aria-label', isSaved ? 'Unsave' : 'Save');
+    updateSavedBadge();
+    if (activeTab === 'saved') renderSavedPage();
+  });
+
+  // card tap → open link
+  el.addEventListener('click', () => window.open(card.link, '_blank', 'noopener'));
+
+  // prevent read-link double-open
+  el.querySelector('.read-link').addEventListener('click', e => e.stopPropagation());
+
+  return el;
+}
+
+function skeletonHTML() {
+  return Array.from({ length: 5 }, () => `
+    <div class="skeleton-card">
+      <div class="skel skel-tag"></div>
+      <div class="skel skel-h1"></div>
+      <div class="skel skel-h2"></div>
+      <div class="skel skel-p1"></div>
+      <div class="skel skel-p2"></div>
+      <div class="skel skel-p3"></div>
+    </div>
+  `).join('');
+}
+
+// Intersection observer for entrance animations
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      io.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.05 });
+
+function renderFeedPage(cards) {
+  const page = document.getElementById('feed-page');
+  page.innerHTML = '';
+  cards.forEach((c, i) => {
+    const el = buildCard(c);
+    // stagger delay capped at 300ms
+    el.style.transitionDelay = `${Math.min(i * 40, 300)}ms`;
+    page.appendChild(el);
+    io.observe(el);
+  });
+  document.getElementById('feed-count').textContent = cards.length || '—';
+}
+
+function renderSavedPage() {
+  const page = document.getElementById('saved-page');
+  page.innerHTML = '';
+
+  const saved = feedCards.filter(c => savedIds.has(c.id));
+
+  if (saved.length === 0) {
+    page.innerHTML = `
+      <div id="empty-saved">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+        </svg>
+        <p>Nothing saved yet.<br>Tap the bookmark on any card.</p>
+      </div>`;
+    return;
+  }
+
+  saved.forEach((c, i) => {
+    const el = buildCard(c);
+    el.style.transitionDelay = `${Math.min(i * 40, 200)}ms`;
+    page.appendChild(el);
+    io.observe(el);
+  });
+}
+
+// ─────────────────────────────────────────────
+// Save / unsave
+// ─────────────────────────────────────────────
+async function toggleSave(card) {
+  if (savedIds.has(card.id)) {
+    savedIds.delete(card.id);
+    await dbDelete(card.id);
+  } else {
+    savedIds.add(card.id);
+    await dbPut(card);
+  }
+}
+
+function updateSavedBadge() {
+  document.getElementById('saved-count').textContent = savedIds.size || '0';
+}
+
+// ─────────────────────────────────────────────
+// Fetch feed
+// ─────────────────────────────────────────────
+async function loadFeed() {
+  const page = document.getElementById('feed-page');
+  const errBanner = document.getElementById('error-banner');
+  const refreshBtn = document.getElementById('refresh-btn');
+
+  errBanner.classList.add('hidden');
+  page.innerHTML = skeletonHTML();
+  refreshBtn.classList.add('spinning');
+
+  try {
+    const res = await fetch('/api/feed');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    feedCards = data.cards || [];
+    renderFeedPage(feedCards);
+  } catch (err) {
+    page.innerHTML = '';
+    document.getElementById('error-msg').textContent = `Failed to load feed: ${err.message}`;
+    errBanner.classList.remove('hidden');
+  } finally {
+    refreshBtn.classList.remove('spinning');
+  }
+}
+
+// ─────────────────────────────────────────────
+// Tabs
+// ─────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const name = tab.dataset.tab;
+    if (name === activeTab) return;
+    activeTab = name;
+
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+    document.getElementById('feed-page').classList.toggle('hidden', name !== 'feed');
+    document.getElementById('saved-page').classList.toggle('hidden', name !== 'saved');
+
+    if (name === 'saved') renderSavedPage();
+  });
+});
+
+document.getElementById('refresh-btn').addEventListener('click', loadFeed);
+document.getElementById('retry-btn').addEventListener('click', loadFeed);
+
+// ─────────────────────────────────────────────
+// Boot
+// ─────────────────────────────────────────────
+(async () => {
+  db = await openDB();
+  const savedArr = await dbGetAll();
+  savedArr.forEach(c => savedIds.add(c.id));
+  updateSavedBadge();
+  await loadFeed();
+})();
+
+// ─────────────────────────────────────────────
+// Service Worker
+// ─────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
