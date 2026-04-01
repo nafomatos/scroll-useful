@@ -1,4 +1,4 @@
-const CACHE = 'pulse-v1';
+const CACHE = 'pulse-v2';
 const STATIC = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {

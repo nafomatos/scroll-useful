@@ -507,9 +507,9 @@ function buildCard(card) {
   // save button (stop propagation so card click doesn't also fire)
   el.querySelector('.save-btn').addEventListener('click', async e => {
     e.stopPropagation();
-    const btn = e.currentTarget; // capture before await — currentTarget is nulled after sync return
     await toggleSave(card);
     const isSaved = savedIds.has(card.id);
+    const btn = el.querySelector('.save-btn'); // re-query from closure el — no currentTarget timing issues
     btn.innerHTML = isSaved ? BOOKMARK_FILLED : BOOKMARK_EMPTY;
     btn.classList.toggle('saved', isSaved);
     btn.setAttribute('aria-label', isSaved ? 'Unsave' : 'Save');
