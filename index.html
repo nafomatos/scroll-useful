@@ -350,6 +350,59 @@
       white-space: nowrap;
     }
 
+    /* ── End of feed ───────────────────────────── */
+    #end-of-feed {
+      text-align: center;
+      padding: 28px 16px 8px;
+    }
+    #end-of-feed.hidden { display: none; }
+    #caught-up {
+      font-size: 13px;
+      color: #444;
+      font-weight: 500;
+      letter-spacing: .02em;
+      margin-bottom: 14px;
+    }
+    #more-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 20px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: color .2s, border-color .2s, background .2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #more-btn:active { background: #1a1a1e; }
+    #more-btn:disabled { opacity: .4; cursor: default; }
+    #more-btn .spin { animation: spin .7s linear infinite; display: none; }
+    #more-btn.loading .spin { display: inline-block; }
+    #more-btn.loading .label { display: none; }
+
+    /* topic divider between batches */
+    .more-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 20px 0 12px;
+      color: #333;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .more-divider::before, .more-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
     /* ── Daily brief ───────────────────────────── */
     #daily-brief {
       margin-bottom: 16px;
@@ -408,6 +461,14 @@
     <span id="brief-text"></span>
   </div>
   <!-- cards rendered here -->
+</div>
+
+<div id="end-of-feed" class="hidden">
+  <p id="caught-up">You're caught up ✓</p>
+  <button id="more-btn">
+    <svg class="spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg>
+    <span class="label">Give me 5 more</span>
+  </button>
 </div>
 
 <div id="saved-page" class="feed-page hidden">
@@ -599,6 +660,7 @@ function renderFeedPage(cards, dailyBrief) {
     io.observe(el);
   });
   document.getElementById('feed-count').textContent = cards.length || '—';
+  document.getElementById('end-of-feed').classList.remove('hidden');
 }
 
 function renderSavedPage() {
@@ -652,6 +714,7 @@ async function loadFeed() {
   const refreshBtn = document.getElementById('refresh-btn');
 
   errBanner.classList.add('hidden');
+  document.getElementById('end-of-feed').classList.add('hidden');
   page.innerHTML = skeletonHTML();
   refreshBtn.classList.add('spinning');
 
@@ -689,6 +752,57 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 document.getElementById('refresh-btn').addEventListener('click', loadFeed);
 document.getElementById('retry-btn').addEventListener('click', loadFeed);
+
+// ─────────────────────────────────────────────
+// "Give me 5 more"
+// ─────────────────────────────────────────────
+const TOPICS = ['tech', 'startups', 'science', 'design', 'finance', 'culture', 'sports'];
+let lastMoreTopic = null;
+
+document.getElementById('more-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('more-btn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  // Pick a random topic, avoiding the same one twice in a row
+  let topic;
+  do { topic = TOPICS[Math.floor(Math.random() * TOPICS.length)]; }
+  while (topic === lastMoreTopic && TOPICS.length > 1);
+  lastMoreTopic = topic;
+
+  try {
+    const res = await fetch(`/api/feed?topic=${topic}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const newCards = (data.cards || []).slice(0, 5);
+    if (newCards.length === 0) throw new Error('No cards returned');
+
+    // Insert a divider before the new batch
+    const page = document.getElementById('feed-page');
+    const endEl = document.getElementById('end-of-feed');
+    const divider = document.createElement('div');
+    divider.className = 'more-divider';
+    divider.textContent = topic;
+    page.insertBefore(divider, endEl);
+
+    // Append new cards before the end-of-feed block
+    newCards.forEach((c, i) => {
+      feedCards.push(c);
+      const el = buildCard(c);
+      el.style.transitionDelay = `${i * 50}ms`;
+      page.insertBefore(el, endEl);
+      // Trigger animation on next frame
+      requestAnimationFrame(() => requestAnimationFrame(() => io.observe(el)));
+    });
+
+    document.getElementById('feed-count').textContent = feedCards.length;
+  } catch (err) {
+    console.error('load more error:', err);
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+});
 
 // ─────────────────────────────────────────────
 // Boot

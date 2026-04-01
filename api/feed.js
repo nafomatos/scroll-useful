@@ -38,29 +38,30 @@ function extractSource(item) {
   }
 }
 
-// Fetch one article from EN feed and one from PT feed for a topic.
-async function fetchTopicArticles(topic) {
-  const fetchOne = async (url, lang) => {
+// Fetch articles for a topic. count controls how many EN items to return (PT always 1).
+async function fetchTopicArticles(topic, count = 1) {
+  const fetchMany = async (url, lang, max) => {
     try {
       const feed = await rssParser.parseURL(url);
-      const item = feed.items[0];
-      if (!item) return null;
-      return {
+      return feed.items.slice(0, max).map(item => ({
         topic,
         lang,
         headline: cleanHeadline(item.title),
         link: item.link,
         source: extractSource(item),
         pubDate: item.pubDate || item.isoDate || null,
-      };
+      }));
     } catch (err) {
       console.warn(`RSS fetch failed for "${topic}" (${lang}):`, err.message);
-      return null;
+      return [];
     }
   };
 
-  const [en, pt] = await Promise.all([fetchOne(rssUrlEN(topic), 'en'), fetchOne(rssUrlPT(topic), 'pt')]);
-  return [en, pt].filter(Boolean);
+  const [en, pt] = await Promise.all([
+    fetchMany(rssUrlEN(topic), 'en', count),
+    fetchMany(rssUrlPT(topic), 'pt', 1),
+  ]);
+  return [...en, ...pt];
 }
 
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
@@ -223,12 +224,28 @@ module.exports = async function handler(req, res) {
   }
 
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Cache-Control', 's-maxage=7200, stale-while-revalidate=600');
+
+  // Single-topic "more" mode vs full feed mode
+  const requestedTopic = req.query && req.query.topic;
+  const singleTopic = requestedTopic && TOPICS.includes(requestedTopic) ? requestedTopic : null;
+
+  // Single-topic results are fresh on every request; full feed is cached 2 h
+  res.setHeader(
+    'Cache-Control',
+    singleTopic ? 'no-store' : 's-maxage=7200, stale-while-revalidate=600',
+  );
 
   try {
-    // 1. Fetch all RSS feeds in parallel
-    const topicBatches = await Promise.all(TOPICS.map(fetchTopicArticles));
-    const articles = topicBatches.flat(); // up to 14 articles
+    // 1. Fetch RSS feeds
+    let articles;
+    if (singleTopic) {
+      // Fetch up to 5 EN articles for the requested topic (no PT to stay fast)
+      articles = await fetchTopicArticles(singleTopic, 5);
+      articles = articles.filter(a => a.lang === 'en').slice(0, 5);
+    } else {
+      const topicBatches = await Promise.all(TOPICS.map(t => fetchTopicArticles(t, 1)));
+      articles = topicBatches.flat(); // up to 14 articles
+    }
 
     if (articles.length === 0) {
       return res.status(502).json({ error: 'No articles fetched from RSS feeds.' });
