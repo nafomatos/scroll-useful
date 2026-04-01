@@ -64,6 +64,45 @@ async function fetchTopicArticles(topic, count = 1) {
   return [...en, ...pt];
 }
 
+// Fetch 1 YouTube video for a topic via the Data API v3.
+async function fetchTopicVideo(topic) {
+  const key = process.env.YOUTUBE_API_KEY;
+  if (!key) return null;
+  try {
+    const qs = new URLSearchParams({
+      part: 'snippet',
+      q: topic,
+      type: 'video',
+      maxResults: '1',
+      relevanceLanguage: 'en',
+      order: 'relevance',
+      key,
+    });
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?${qs}`, {
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const item = data.items?.[0];
+    if (!item) return null;
+    const { videoId } = item.id;
+    const s = item.snippet;
+    return {
+      topic,
+      type: 'video',
+      headline: s.title,
+      source: s.channelTitle,
+      link: `https://www.youtube.com/watch?v=${videoId}`,
+      thumbnail: s.thumbnails?.medium?.url || s.thumbnails?.default?.url || null,
+      pubDate: s.publishedAt || null,
+      text: s.description || '',
+    };
+  } catch (err) {
+    console.warn(`YouTube fetch failed for "${topic}":`, err.message);
+    return null;
+  }
+}
+
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 const ON_GOOGLE = /\bgoogle\.com\b/;
 
@@ -240,44 +279,75 @@ module.exports = async function handler(req, res) {
   );
 
   try {
-    // 1. Fetch RSS feeds
-    let articles;
+    let allItems;
+
     if (singleTopic) {
-      // Fetch up to 5 EN articles for the requested topic (no PT to stay fast)
-      articles = await fetchTopicArticles(singleTopic, 5);
-      articles = articles.filter(a => a.lang === 'en').slice(0, 5);
+      // ── Single-topic "give me more" mode ──────────────────────────────────
+      const [articles, video] = await Promise.all([
+        fetchTopicArticles(singleTopic, 5).then(a => a.filter(x => x.lang === 'en').slice(0, 4)),
+        fetchTopicVideo(singleTopic),
+      ]);
+      if (articles.length === 0) {
+        return res.status(502).json({ error: 'No articles fetched from RSS feeds.' });
+      }
+      // Scrape article thumbnails + text
+      const scraped = await Promise.allSettled(articles.map(a => scrapeArticle(a.link)));
+      const rich = articles.map((a, i) => ({
+        ...a,
+        text:      scraped[i].status === 'fulfilled' ? scraped[i].value.text      : '',
+        thumbnail: scraped[i].status === 'fulfilled' ? scraped[i].value.thumbnail : null,
+      }));
+      // Insert video at position 2 for a natural feel
+      if (video && rich.length >= 2) rich.splice(2, 0, video);
+      else if (video) rich.push(video);
+      allItems = rich;
+
     } else {
-      const topicBatches = await Promise.all(TOPICS.map(t => fetchTopicArticles(t, 1)));
-      articles = topicBatches.flat(); // up to 14 articles
+      // ── Full feed mode ─────────────────────────────────────────────────────
+      // Fetch articles + videos for all topics in parallel
+      const [articleBatches, videoResults] = await Promise.all([
+        Promise.all(TOPICS.map(t => fetchTopicArticles(t, 1))),
+        Promise.all(TOPICS.map(t => fetchTopicVideo(t))),
+      ]);
+      const articles = articleBatches.flat(); // up to 14 articles
+      if (articles.length === 0) {
+        return res.status(502).json({ error: 'No articles fetched from RSS feeds.' });
+      }
+
+      // Scrape article thumbnails + text (videos already have YT thumbnails)
+      const scraped = await Promise.allSettled(articles.map(a => scrapeArticle(a.link)));
+      const articlesRich = articles.map((a, i) => ({
+        ...a,
+        text:      scraped[i].status === 'fulfilled' ? scraped[i].value.text      : '',
+        thumbnail: scraped[i].status === 'fulfilled' ? scraped[i].value.thumbnail : null,
+      }));
+
+      // Interleave per topic: [EN article, PT article, video] for each topic
+      const videoByTopic = Object.fromEntries(
+        videoResults.filter(Boolean).map(v => [v.topic, v])
+      );
+      allItems = TOPICS.flatMap(topic => {
+        const topicArticles = articlesRich.filter(a => a.topic === topic);
+        const video = videoByTopic[topic];
+        return video ? [...topicArticles, video] : topicArticles;
+      });
     }
 
-    if (articles.length === 0) {
-      return res.status(502).json({ error: 'No articles fetched from RSS feeds.' });
-    }
-
-    // 2. Scrape article text + thumbnail in parallel
-    const scraped = await Promise.allSettled(articles.map((a) => scrapeArticle(a.link)));
-    const articlesWithText = articles.map((a, i) => ({
-      ...a,
-      text:      scraped[i].status === 'fulfilled' ? scraped[i].value.text      : '',
-      thumbnail: scraped[i].status === 'fulfilled' ? scraped[i].value.thumbnail : null,
-    }));
-
-    // 3. Single Claude call for all summaries + daily brief
-    const { daily_brief, summaries } = await summariseAll(articlesWithText);
+    // 2. Single Claude call — summaries for every item (articles + videos)
+    const { daily_brief, summaries } = await summariseAll(allItems);
     const summaryMap = Object.fromEntries(summaries.map((s) => [s.id, s.summary]));
 
-    // 4. Build response cards
-    const cards = articlesWithText.map((a, i) => ({
-      id: `${a.topic}-${i}`,
-      topic: a.topic,
-      type: 'article',
-      headline: a.headline,
+    // 3. Build response cards
+    const cards = allItems.map((item, i) => ({
+      id: `${item.topic}-${item.type || 'article'}-${i}`,
+      topic: item.topic,
+      type: item.type || 'article',
+      headline: item.headline,
       summary: summaryMap[i] || '',
-      source: a.source,
-      link: a.link,
-      pubDate: a.pubDate,
-      thumbnail: a.thumbnail || null,
+      source: item.source,
+      link: item.link,
+      pubDate: item.pubDate,
+      thumbnail: item.thumbnail || null,
       saved: false,
     }));
 
