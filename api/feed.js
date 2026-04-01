@@ -158,8 +158,10 @@ async function summariseAll(articles) {
 
   const prompt = `You are a sharp, concise news editor. For each article below write a 2-3 sentence summary in ENGLISH that captures the key facts and why it matters. Even if the article is in Portuguese, write the summary in English.
 
-Return ONLY a valid JSON array — no markdown fences, no extra keys — in this exact shape:
-[{"id":0,"summary":"..."},{"id":1,"summary":"..."},...]
+Also write a single "daily_brief" — one punchy sentence (max 25 words) capturing the overall vibe across all topics today. Be specific, not generic. Example: "Tech is heavy on AI layoffs today, Science has a surprising materials breakthrough, and Sports is all about managerial shakeups."
+
+Return ONLY a valid JSON object — no markdown fences — in this exact shape:
+{"daily_brief":"...","summaries":[{"id":0,"summary":"..."},{"id":1,"summary":"..."},...]}
 
 Articles:
 
@@ -188,13 +190,23 @@ ${numbered}`;
 
   const raw = (msg.content[0]?.text || '').trim();
 
-  // Parse; fall back to regex extraction if Claude wrapped it in markdown
+  // Parse the new envelope shape; fall back gracefully
   try {
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    // Handle both new {daily_brief, summaries:[]} and legacy [] shapes
+    if (Array.isArray(parsed)) return { daily_brief: '', summaries: parsed };
+    return { daily_brief: parsed.daily_brief || '', summaries: parsed.summaries || [] };
   } catch {
-    const m = raw.match(/\[[\s\S]*\]/);
-    if (m) return JSON.parse(m[0]);
-    return [];
+    const obj = raw.match(/\{[\s\S]*\}/);
+    if (obj) {
+      try {
+        const parsed = JSON.parse(obj[0]);
+        return { daily_brief: parsed.daily_brief || '', summaries: parsed.summaries || [] };
+      } catch { /* fall through */ }
+    }
+    const arr = raw.match(/\[[\s\S]*\]/);
+    if (arr) return { daily_brief: '', summaries: JSON.parse(arr[0]) };
+    return { daily_brief: '', summaries: [] };
   }
 }
 
@@ -230,8 +242,8 @@ module.exports = async function handler(req, res) {
       thumbnail: scraped[i].status === 'fulfilled' ? scraped[i].value.thumbnail : null,
     }));
 
-    // 3. Single Claude call for all summaries
-    const summaries = await summariseAll(articlesWithText);
+    // 3. Single Claude call for all summaries + daily brief
+    const { daily_brief, summaries } = await summariseAll(articlesWithText);
     const summaryMap = Object.fromEntries(summaries.map((s) => [s.id, s.summary]));
 
     // 4. Build response cards
@@ -249,6 +261,7 @@ module.exports = async function handler(req, res) {
     }));
 
     return res.status(200).json({
+      daily_brief,
       cards,
       count: cards.length,
       generatedAt: new Date().toISOString(),

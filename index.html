@@ -350,13 +350,30 @@
       white-space: nowrap;
     }
 
-    /* ── Pull-to-refresh hint ───────────────────── */
-    #ptr {
-      text-align: center;
-      font-size: 11px;
-      color: #333;
-      padding: 10px;
-      letter-spacing: .04em;
+    /* ── Daily brief ───────────────────────────── */
+    #daily-brief {
+      margin-bottom: 16px;
+      padding: 13px 15px;
+      border-radius: 13px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.07);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    #daily-brief.hidden { display: none; }
+    .brief-icon {
+      font-size: 14px;
+      line-height: 1;
+      margin-top: 1px;
+      flex-shrink: 0;
+      opacity: .7;
+    }
+    #brief-text {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #aaa;
+      font-style: italic;
     }
 
     /* scrollbar */
@@ -386,6 +403,10 @@
 </div>
 
 <div id="feed-page" class="feed-page">
+  <div id="daily-brief" class="hidden">
+    <span class="brief-icon">✦</span>
+    <span id="brief-text"></span>
+  </div>
   <!-- cards rendered here -->
 </div>
 
@@ -552,9 +573,24 @@ const io = new IntersectionObserver(entries => {
   });
 }, { threshold: 0.05 });
 
-function renderFeedPage(cards) {
+function renderFeedPage(cards, dailyBrief) {
   const page = document.getElementById('feed-page');
+  // Rebuild brief + placeholder so we don't lose the element on innerHTML wipe
+  const briefEl = document.getElementById('daily-brief') || (() => {
+    const d = document.createElement('div'); d.id = 'daily-brief'; d.className = 'hidden';
+    d.innerHTML = '<span class="brief-icon">✦</span><span id="brief-text"></span>';
+    return d;
+  })();
   page.innerHTML = '';
+  page.appendChild(briefEl);
+
+  if (dailyBrief) {
+    document.getElementById('brief-text').textContent = dailyBrief;
+    briefEl.classList.remove('hidden');
+  } else {
+    briefEl.classList.add('hidden');
+  }
+
   cards.forEach((c, i) => {
     const el = buildCard(c);
     // stagger delay capped at 300ms
@@ -624,7 +660,7 @@ async function loadFeed() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     feedCards = data.cards || [];
-    renderFeedPage(feedCards);
+    renderFeedPage(feedCards, data.daily_brief || '');
   } catch (err) {
     page.innerHTML = '';
     document.getElementById('error-msg').textContent = `Failed to load feed: ${err.message}`;
