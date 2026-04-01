@@ -429,6 +429,100 @@
       font-style: italic;
     }
 
+    /* ── Save tag pill (Saved tab) ─────────────── */
+    .save-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 20px;
+      padding: 3px 9px;
+      margin-top: 8px;
+    }
+
+    /* ── Intent bottom sheet ───────────────────── */
+    #intent-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 200;
+      display: flex;
+      align-items: flex-end;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease;
+    }
+    #intent-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+    #intent-sheet {
+      width: 100%;
+      background: #18181b;
+      border-radius: 20px 20px 0 0;
+      border-top: 1px solid #2a2a2e;
+      padding: 12px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+      transform: translateY(100%);
+      transition: transform .28s cubic-bezier(.32,1,.23,1);
+    }
+    #intent-overlay.open #intent-sheet {
+      transform: translateY(0);
+    }
+    #intent-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #222;
+    }
+    #intent-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: .01em;
+    }
+    #intent-close {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: none;
+      background: #2a2a2e;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #intent-options {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .intent-opt {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid #222;
+      background: #111114;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      transition: background .15s, border-color .15s;
+      -webkit-tap-highlight-color: transparent;
+      text-align: left;
+      width: 100%;
+    }
+    .intent-opt:active { background: #1f1f23; border-color: #333; }
+    .intent-opt .emoji { font-size: 18px; line-height: 1; }
+
     /* scrollbar */
     ::-webkit-scrollbar { width: 0; }
   </style>
@@ -447,6 +541,22 @@
   <div id="tabs">
     <button class="tab active" data-tab="feed">Feed <span class="badge" id="feed-count">—</span></button>
     <button class="tab" data-tab="saved">Saved <span class="badge" id="saved-count">0</span></button>
+  </div>
+</div>
+
+<div id="intent-overlay">
+  <div id="intent-sheet">
+    <div id="intent-header">
+      <span id="intent-title">Save as…</span>
+      <button id="intent-close" aria-label="Dismiss">×</button>
+    </div>
+    <div id="intent-options">
+      <button class="intent-opt" data-tag="💡 Interesting"><span class="emoji">💡</span> Interesting</button>
+      <button class="intent-opt" data-tag="📌 Read later"><span class="emoji">📌</span> Read later</button>
+      <button class="intent-opt" data-tag="🔍 Research"><span class="emoji">🔍</span> Research</button>
+      <button class="intent-opt" data-tag="💼 Work relevant"><span class="emoji">💼</span> Work relevant</button>
+      <button class="intent-opt" data-tag="🗣️ Share"><span class="emoji">🗣️</span> Share</button>
+    </div>
   </div>
 </div>
 
@@ -523,6 +633,7 @@ function dbDelete(id) {
 // ─────────────────────────────────────────────
 let feedCards = [];
 let savedIds = new Set();
+let savedCardsMap = new Map(); // id → full card object (includes saveTag)
 let activeTab = 'feed';
 
 // ─────────────────────────────────────────────
@@ -558,6 +669,11 @@ function buildCard(card) {
     ? `<img class="card-thumbnail" src="${card.thumbnail}" alt="" loading="lazy" decoding="async">`
     : '';
 
+  const savedCard = savedIds.has(card.id) ? savedCardsMap.get(card.id) : null;
+  const tagHTML = savedCard?.saveTag
+    ? `<span class="save-tag">${savedCard.saveTag}</span>`
+    : '';
+
   el.innerHTML = `
     ${thumbHTML}
     <div class="card-body">
@@ -576,6 +692,7 @@ function buildCard(card) {
         </div>
         <a class="read-link" href="${card.link}" target="_blank" rel="noopener" aria-label="Read article">Read ${ARROW_SVG}</a>
       </div>
+      ${tagHTML}
     </div>
   `;
 
@@ -586,17 +703,20 @@ function buildCard(card) {
     img.addEventListener('error', () => img.style.display = 'none');
   }
 
-  // save button (stop propagation so card click doesn't also fire)
+  // save button — if already saved, unsave directly; otherwise open intent sheet
   el.querySelector('.save-btn').addEventListener('click', async e => {
     e.stopPropagation();
-    await toggleSave(card);
-    const isSaved = savedIds.has(card.id);
-    const btn = el.querySelector('.save-btn'); // re-query from closure el — no currentTarget timing issues
-    btn.innerHTML = isSaved ? BOOKMARK_FILLED : BOOKMARK_EMPTY;
-    btn.classList.toggle('saved', isSaved);
-    btn.setAttribute('aria-label', isSaved ? 'Unsave' : 'Save');
-    updateSavedBadge();
-    if (activeTab === 'saved') renderSavedPage();
+    if (savedIds.has(card.id)) {
+      await unsaveCard(card.id);
+      const btn = el.querySelector('.save-btn');
+      btn.innerHTML = BOOKMARK_EMPTY;
+      btn.classList.remove('saved');
+      btn.setAttribute('aria-label', 'Save');
+      updateSavedBadge();
+      if (activeTab === 'saved') renderSavedPage();
+    } else {
+      openIntentSheet(card, el);
+    }
   });
 
   // card tap → open link
@@ -691,19 +811,63 @@ function renderSavedPage() {
 // ─────────────────────────────────────────────
 // Save / unsave
 // ─────────────────────────────────────────────
-async function toggleSave(card) {
-  if (savedIds.has(card.id)) {
-    savedIds.delete(card.id);
-    await dbDelete(card.id);
-  } else {
-    savedIds.add(card.id);
-    await dbPut(card);
-  }
+async function saveCard(card, saveTag) {
+  const record = { ...card, saveTag };
+  savedIds.add(card.id);
+  savedCardsMap.set(card.id, record);
+  await dbPut(record);
+}
+
+async function unsaveCard(id) {
+  savedIds.delete(id);
+  savedCardsMap.delete(id);
+  await dbDelete(id);
 }
 
 function updateSavedBadge() {
   document.getElementById('saved-count').textContent = savedIds.size || '0';
 }
+
+// ─────────────────────────────────────────────
+// Intent sheet
+// ─────────────────────────────────────────────
+let intentCard = null;
+let intentCardEl = null;
+
+function openIntentSheet(card, el) {
+  intentCard = card;
+  intentCardEl = el;
+  document.getElementById('intent-overlay').classList.add('open');
+}
+
+function closeIntentSheet() {
+  document.getElementById('intent-overlay').classList.remove('open');
+  intentCard = null;
+  intentCardEl = null;
+}
+
+document.getElementById('intent-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('intent-overlay')) closeIntentSheet();
+});
+document.getElementById('intent-close').addEventListener('click', closeIntentSheet);
+
+document.querySelectorAll('.intent-opt').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const tag = btn.dataset.tag;
+    const card = intentCard;
+    const el = intentCardEl;
+    closeIntentSheet();
+    if (!card || !el) return;
+
+    await saveCard(card, tag);
+    const saveBtn = el.querySelector('.save-btn');
+    saveBtn.innerHTML = BOOKMARK_FILLED;
+    saveBtn.classList.add('saved');
+    saveBtn.setAttribute('aria-label', 'Unsave');
+    updateSavedBadge();
+    if (activeTab === 'saved') renderSavedPage();
+  });
+});
 
 // ─────────────────────────────────────────────
 // Fetch feed
@@ -810,7 +974,7 @@ document.getElementById('more-btn').addEventListener('click', async () => {
 (async () => {
   db = await openDB();
   const savedArr = await dbGetAll();
-  savedArr.forEach(c => savedIds.add(c.id));
+  savedArr.forEach(c => { savedIds.add(c.id); savedCardsMap.set(c.id, c); });
   updateSavedBadge();
   await loadFeed();
 })();

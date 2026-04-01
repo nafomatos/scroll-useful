@@ -65,77 +65,81 @@ async function fetchTopicArticles(topic, count = 1) {
 }
 
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+const ON_GOOGLE = /\bgoogle\.com\b/;
 
-// Fetch og:image from a fully-resolved article URL.
-async function fetchOgImage(articleUrl) {
+// Step 1 — resolve a Google News redirect to the real article URL.
+// Tries og:url, canonical, meta-refresh, then any non-Google link in the page.
+async function resolveRedirect(googleUrl) {
   try {
-    const res = await fetch(articleUrl, {
-      headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' },
+    const res = await fetch(googleUrl, {
+      headers: { 'User-Agent': UA, Accept: 'text/html' },
       redirect: 'follow',
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(6000),
     });
-    if (!res.ok) return null;
+    const landedUrl = res.url || googleUrl;
+
+    // HTTP redirects already took us off Google — done
+    if (!ON_GOOGLE.test(new URL(landedUrl).hostname)) return landedUrl;
+
     const html = await res.text();
-    const finalUrl = res.url || articleUrl;
-    const doc = new JSDOM(html, { url: finalUrl }).window.document;
-    const content =
-      doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
-      doc.querySelector('meta[property="twitter:image"]')?.getAttribute('content') ||
-      doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content');
-    if (!content) return null;
-    return new URL(content, finalUrl).href;
+    const doc = new JSDOM(html, { url: landedUrl }).window.document;
+
+    const candidates = [
+      doc.querySelector('meta[property="og:url"]')?.getAttribute('content'),
+      doc.querySelector('link[rel="canonical"]')?.getAttribute('href'),
+      // meta-refresh: content="0; url=https://..."
+      doc.querySelector('meta[http-equiv="refresh"]')
+        ?.getAttribute('content')?.match(/url=([^\s;'"]+)/i)?.[1],
+      // any external non-Google link in the page body
+      ...[...doc.querySelectorAll('a[href^="http"]')].map(a => a.getAttribute('href')),
+    ];
+
+    for (const c of candidates) {
+      if (!c) continue;
+      try {
+        const u = new URL(c.replace(/&amp;/g, '&'), landedUrl);
+        if (!ON_GOOGLE.test(u.hostname)) return u.href;
+      } catch { /* skip */ }
+    }
+    return null; // could not resolve
   } catch {
     return null;
   }
 }
 
-// Scrape article text + thumbnail. Resolves Google News redirect pages to the
-// real article URL before extracting og:image.
+// Step 2 — fetch the real article page and pull out og:image + readable text.
 async function scrapeArticle(url) {
   try {
-    const res = await fetch(url, {
+    // Resolve Google News redirects first
+    const articleUrl = ON_GOOGLE.test(new URL(url).hostname)
+      ? await resolveRedirect(url)
+      : url;
+
+    if (!articleUrl) return { text: '', thumbnail: null };
+
+    const res = await fetch(articleUrl, {
       headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml' },
       redirect: 'follow',
       signal: AbortSignal.timeout(SCRAPE_TIMEOUT_MS),
     });
-
     if (!res.ok) return { text: '', thumbnail: null };
-    const html = await res.text();
 
-    const finalUrl = res.url || url;
+    const html = await res.text();
+    const finalUrl = res.url || articleUrl;
     const dom = new JSDOM(html, { url: finalUrl });
     const doc = dom.window.document;
 
-    // Check if HTTP redirects left us on a Google page (JS-redirect intermediate).
-    // If so, dig out the real article URL from og:url or canonical, then fetch
-    // its og:image separately. We don't try to re-scrape text — Claude handles
-    // empty text gracefully via the headline.
-    const onGoogle = /\bnews\.google\.com\b/.test(new URL(finalUrl).hostname);
+    // og:image from the real article page
+    const imgRaw =
+      doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
+      doc.querySelector('meta[property="twitter:image"]')?.getAttribute('content') ||
+      doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content');
     let thumbnail = null;
-
-    if (onGoogle) {
-      const ogUrl = doc.querySelector('meta[property="og:url"]')?.getAttribute('content');
-      const canonical = doc.querySelector('link[rel="canonical"]')?.href;
-      const candidate = ogUrl || canonical;
-      if (candidate) {
-        try {
-          const resolved = new URL(candidate, finalUrl).href;
-          if (!/\bnews\.google\.com\b/.test(new URL(resolved).hostname)) {
-            thumbnail = await fetchOgImage(resolved);
-          }
-        } catch { /* ignore bad URLs */ }
-      }
-    } else {
-      // Already on the real article page — extract og:image directly.
-      const content =
-        doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
-        doc.querySelector('meta[property="twitter:image"]')?.getAttribute('content') ||
-        doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content');
-      if (content) {
-        try { thumbnail = new URL(content, finalUrl).href; } catch { /* ignore */ }
-      }
+    if (imgRaw) {
+      try { thumbnail = new URL(imgRaw, finalUrl).href; } catch { /* ignore */ }
     }
 
+    // Readable text for Claude
     const reader = new Readability(doc);
     const article = reader.parse();
     const text = article?.textContent
