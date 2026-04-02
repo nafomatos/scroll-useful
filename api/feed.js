@@ -207,7 +207,7 @@ const STYLE_INSTRUCTIONS = {
 };
 
 // Ask Claude to summarise all articles in one shot and return JSON array.
-async function summariseAll(articles, style = 'direct', seenHeadlines = [], interestBrief = '') {
+async function summariseAll(articles, style = 'direct', seenHeadlines = [], interestBrief = '', mindset = '') {
   const numbered = articles
     .map(
       (a, i) =>
@@ -225,9 +225,13 @@ async function summariseAll(articles, style = 'direct', seenHeadlines = [], inte
     ? `\n\nUSER INTERESTS: The user is particularly interested in: ${interestBrief}. When summarising, highlight relevance to these interests where applicable and prioritise surfacing stories connected to them.`
     : '';
 
+  const mindsetSection = mindset
+    ? `\n\nUSER'S CURRENT MINDSET: The user is currently thinking about: ${mindset}. Where relevant, highlight connections between articles and these themes.`
+    : '';
+
   const prompt = `You are a sharp morning briefing editor. For each article below write a 2-3 sentence summary in ENGLISH. Even if the article is in Portuguese, write in English.
 
-STYLE: ${styleNote}${interestSection}
+STYLE: ${styleNote}${interestSection}${mindsetSection}
 
 Also write a "daily_brief" — 3 to 4 sentences written like an insightful morning editorial. Don't just list headlines. Connect the dots between topics, surface the tension or irony between stories, give the reader a sense of what's really happening across the day. Be conversational and specific.${seenSection}
 
@@ -301,6 +305,9 @@ module.exports = async function handler(req, res) {
   const briefRaw = req.query && req.query.brief;
   const interestBrief = briefRaw ? String(briefRaw).slice(0, 300).trim() : '';
 
+  const mindsetRaw = req.query && req.query.mindset;
+  const mindset = mindsetRaw ? String(mindsetRaw).slice(0, 300).trim() : '';
+
   // Personalized requests are not shared-cached; default full feed is cached 2 h
   const isPersonalized = preferredTopics.length > 0 || seenHeadlines.length > 0;
   res.setHeader(
@@ -360,7 +367,7 @@ module.exports = async function handler(req, res) {
     }
 
     // 2. Single Claude call — summaries + duplicate detection
-    const { daily_brief, summaries } = await summariseAll(allItems, style, seenHeadlines, interestBrief);
+    const { daily_brief, summaries } = await summariseAll(allItems, style, seenHeadlines, interestBrief, mindset);
     const summaryMap = Object.fromEntries(summaries.map(s => [s.id, s]));
 
     // 3. Build response cards

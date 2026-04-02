@@ -730,17 +730,85 @@
       transform: scale(.95);
       transition: opacity .2s ease, transform .2s ease;
     }
+    .note-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
     .note-card-text {
       font-size: 14.5px;
       line-height: 1.6;
       color: var(--text);
-      margin-bottom: 8px;
       white-space: pre-wrap;
     }
     .note-card-time {
       font-size: 11.5px;
       color: #555;
       font-weight: 500;
+    }
+    .note-delete-btn {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      color: #444;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: color .15s, background .15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .note-delete-btn:active { color: #f87171; background: rgba(239,68,68,.1); }
+    .note-delete-btn svg { width: 13px; height: 13px; }
+    .note-confirm {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+    .note-confirm.hidden { display: none; }
+    .note-confirm span { flex: 1; }
+    .note-confirm-yes, .note-confirm-no {
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .note-confirm-yes { background: rgba(239,68,68,.15); color: #f87171; }
+    .note-confirm-no  { background: rgba(255,255,255,.06); color: var(--muted); }
+    .note-confirm-yes:active { background: rgba(239,68,68,.25); }
+    .note-confirm-no:active  { background: rgba(255,255,255,.1); }
+
+    /* ── Mindset block ("Your mind right now") ─── */
+    #mindset-block {
+      margin-bottom: 16px;
+      padding: 14px 16px;
+      border-left: 3px solid rgba(255,255,255,.1);
+      background: rgba(255,255,255,.02);
+      border-radius: 0 12px 12px 0;
+    }
+    #mindset-block.hidden { display: none; }
+    #mindset-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #444;
+      margin-bottom: 8px;
+    }
+    #mindset-text {
+      font-size: 13px;
+      line-height: 1.65;
+      color: #888;
+      font-style: italic;
     }
     #empty-notes {
       display: flex;
@@ -1181,6 +1249,8 @@ let notesArr = []; // [{id, text, ts}] sorted newest-first
 let signals = []; // [{id, type:'save'|'read', topic, intent?, ts}]
 let readingStyle = 'direct'; // persisted in settings
 let interestBrief = ''; // persisted in settings as interest_brief
+let mindsetSummary = ''; // cached "Your mind right now" summary
+let mindsetNoteCount = -1; // note count at last mindset generation (-1 = never)
 let currentConnections = null; // cached connections result
 
 // ─────────────────────────────────────────────
@@ -1446,33 +1516,97 @@ function formatNoteTime(ts) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+const TRASH_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
+
+async function deleteNote(id, el) {
+  el.classList.add('deleting');
+  await dbDeleteNote(id);
+  notesArr = notesArr.filter(n => n.id !== id);
+  updateBadges();
+  // Invalidate mindset cache so it refreshes next time Notes tab opens
+  mindsetNoteCount = -1;
+  setTimeout(() => el.remove(), 220);
+}
+
 function buildNoteCard(note) {
   const el = document.createElement('div');
   el.className = 'note-card';
   el.dataset.id = note.id;
   el.innerHTML = `
+    <div class="note-card-header">
+      <div class="note-card-time">${formatNoteTime(note.ts)}</div>
+      <button class="note-delete-btn" aria-label="Delete note">${TRASH_SVG}</button>
+    </div>
     <div class="note-card-text">${note.text.replace(/</g, '&lt;')}</div>
-    <div class="note-card-time">${formatNoteTime(note.ts)}</div>
+    <div class="note-confirm hidden">
+      <span>Delete this note?</span>
+      <button class="note-confirm-no">No</button>
+      <button class="note-confirm-yes">Yes</button>
+    </div>
   `;
 
-  // Long-press to delete
-  let pressTimer = null;
-  const startPress = () => {
-    pressTimer = setTimeout(async () => {
-      el.classList.add('deleting');
-      await dbDeleteNote(note.id);
-      notesArr = notesArr.filter(n => n.id !== note.id);
-      updateBadges();
-      setTimeout(() => el.remove(), 220);
-    }, 600);
-  };
-  const cancelPress = () => clearTimeout(pressTimer);
-  el.addEventListener('pointerdown', startPress);
-  el.addEventListener('pointerup', cancelPress);
-  el.addEventListener('pointerleave', cancelPress);
-  el.addEventListener('contextmenu', e => e.preventDefault());
+  const confirmEl = el.querySelector('.note-confirm');
+  const deleteBtn = el.querySelector('.note-delete-btn');
+
+  deleteBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    confirmEl.classList.remove('hidden');
+    deleteBtn.style.display = 'none';
+  });
+  el.querySelector('.note-confirm-no').addEventListener('click', e => {
+    e.stopPropagation();
+    confirmEl.classList.add('hidden');
+    deleteBtn.style.display = '';
+  });
+  el.querySelector('.note-confirm-yes').addEventListener('click', async e => {
+    e.stopPropagation();
+    await deleteNote(note.id, el);
+  });
 
   return el;
+}
+
+function renderMindsetBlock(state) {
+  const block = document.getElementById('mindset-block');
+  const text = document.getElementById('mindset-text');
+  if (!block || !text) return;
+  if (!state || notesArr.length < 3) { block.classList.add('hidden'); return; }
+  if (state === 'loading') {
+    text.textContent = 'Thinking…';
+    block.classList.remove('hidden');
+    return;
+  }
+  text.textContent = state;
+  block.classList.remove('hidden');
+}
+
+async function checkAndRefreshMindset() {
+  if (notesArr.length < 3) return;
+  // Already up to date
+  if (notesArr.length === mindsetNoteCount && mindsetSummary) {
+    renderMindsetBlock(mindsetSummary);
+    return;
+  }
+  renderMindsetBlock('loading');
+  try {
+    const res = await fetch('/api/mindset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: notesArr.map(n => n.text) }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    mindsetSummary = data.summary || '';
+    mindsetNoteCount = notesArr.length;
+    await Promise.all([
+      dbPutSetting('mindset_summary', mindsetSummary),
+      dbPutSetting('mindset_note_count', mindsetNoteCount),
+    ]);
+    renderMindsetBlock(mindsetSummary);
+  } catch (err) {
+    console.warn('Mindset fetch failed:', err.message);
+    renderMindsetBlock(mindsetSummary || null);
+  }
 }
 
 function renderConnectionsBlock(state) {
@@ -1535,6 +1669,13 @@ function renderNotesPage() {
   const page = document.getElementById('notes-page');
   page.innerHTML = '';
 
+  // Mindset block ("Your mind right now") — shown when ≥3 notes
+  const mindsetEl = document.createElement('div');
+  mindsetEl.id = 'mindset-block';
+  mindsetEl.className = 'hidden';
+  mindsetEl.innerHTML = '<div id="mindset-label">Your mind right now</div><p id="mindset-text"></p>';
+  page.appendChild(mindsetEl);
+
   // Connections block placeholder (always rendered; shown/hidden dynamically)
   const connectionsEl = document.createElement('div');
   connectionsEl.id = 'connections-block';
@@ -1558,7 +1699,8 @@ function renderNotesPage() {
     });
   }
 
-  // Kick off connections check (async, non-blocking)
+  // Kick off mindset + connections checks (async, non-blocking)
+  checkAndRefreshMindset().catch(() => {});
   checkAndTriggerConnections().catch(() => {});
 }
 
@@ -1724,6 +1866,7 @@ captureSaveBtn.addEventListener('click', async () => {
   if (!text) return;
   const note = { id: `note-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, text, ts: Date.now() };
   notesArr.unshift(note);
+  mindsetNoteCount = -1; // new note → invalidate mindset cache
   updateBadges();
   await dbPutNote(note);
   closeCaptureSheet();
@@ -1750,6 +1893,7 @@ async function loadFeed() {
     if (pref.length > 0) params.set('pref', pref.join(','));
     params.set('style', readingStyle);
     if (interestBrief.trim()) params.set('brief', interestBrief.trim().slice(0, 300));
+    if (mindsetSummary.trim()) params.set('mindset', mindsetSummary.trim().slice(0, 300));
     // Pass last 10 saved headlines for duplicate detection
     const recentHeadlines = [...savedCardsMap.values()]
       .slice(-10)
@@ -1851,18 +1995,22 @@ document.getElementById('more-btn').addEventListener('click', async () => {
 // ─────────────────────────────────────────────
 (async () => {
   db = await openDB();
-  const [savedArr, notesFromDB, signalsFromDB, storedStyle, storedBrief] = await Promise.all([
+  const [savedArr, notesFromDB, signalsFromDB, storedStyle, storedBrief, storedMindset, storedMindsetCount] = await Promise.all([
     dbGetAll(),
     dbGetAllNotes(),
     dbGetAllSignals(),
     dbGetSetting('reading_style'),
     dbGetSetting('interest_brief'),
+    dbGetSetting('mindset_summary'),
+    dbGetSetting('mindset_note_count'),
   ]);
   savedArr.forEach(c => { savedIds.add(c.id); savedCardsMap.set(c.id, c); });
   notesArr = notesFromDB.sort((a, b) => b.ts - a.ts);
   signals = signalsFromDB;
   if (storedStyle) readingStyle = storedStyle;
   if (storedBrief) interestBrief = storedBrief;
+  if (storedMindset) mindsetSummary = storedMindset;
+  if (storedMindsetCount != null) mindsetNoteCount = storedMindsetCount;
   updateBadges();
   await loadFeed();
 })();
