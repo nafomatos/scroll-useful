@@ -200,9 +200,9 @@ async function summariseAll(articles) {
     )
     .join('\n\n---\n\n');
 
-  const prompt = `You are a sharp, concise news editor. For each article below write a 2-3 sentence summary in ENGLISH that captures the key facts and why it matters. Even if the article is in Portuguese, write the summary in English.
+  const prompt = `You are a sharp morning briefing editor. For each article below write a 2-3 sentence summary in ENGLISH. Even if the article is in Portuguese, write in English.
 
-Also write a single "daily_brief" — one punchy sentence (max 25 words) capturing the overall vibe across all topics today. Be specific, not generic. Example: "Tech is heavy on AI layoffs today, Science has a surprising materials breakthrough, and Sports is all about managerial shakeups."
+Also write a "daily_brief" — 3 to 4 sentences written like an insightful morning editorial. Don't just list headlines. Connect the dots between topics, surface the tension or irony between stories, give the reader a sense of what's really happening across the day. Be conversational and specific. Example tone: "Markets are reacting nervously to tech layoffs while AI startups paradoxically raise record rounds — a tension worth watching today. Science quietly published a materials breakthrough that most feeds will bury under the noise. Sports is in full managerial shakeup mode, which usually signals a deeper frustration with ownership."
 
 Return ONLY a valid JSON object — no markdown fences — in this exact shape:
 {"daily_brief":"...","summaries":[{"id":0,"summary":"..."},{"id":1,"summary":"..."},...]}

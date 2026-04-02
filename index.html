@@ -423,33 +423,31 @@
       background: var(--border);
     }
 
-    /* ── Daily brief ───────────────────────────── */
-    #daily-brief {
-      margin-bottom: 16px;
-      padding: 13px 15px;
-      border-radius: 13px;
-      background: rgba(255,255,255,.04);
-      border: 1px solid rgba(255,255,255,.07);
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
+    /* ── Carta do Momento ──────────────────────── */
+    #carta {
+      margin-bottom: 20px;
+      padding: 14px 16px;
+      border-left: 3px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.025);
+      border-radius: 0 12px 12px 0;
     }
-    #daily-brief.hidden { display: none; }
-    .brief-icon {
-      font-size: 14px;
-      line-height: 1;
-      margin-top: 1px;
-      flex-shrink: 0;
-      opacity: .7;
+    #carta.hidden { display: none; }
+    #carta-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #555;
+      margin-bottom: 8px;
     }
-    #brief-text {
-      font-size: 13px;
-      line-height: 1.5;
-      color: #aaa;
+    #carta-text {
+      font-size: 13.5px;
+      line-height: 1.7;
+      color: #bbb;
       font-style: italic;
     }
 
-    /* ── Save tag pill (Saved tab) ─────────────── */
+    /* ── Save tag pill + note ──────────────────── */
     .save-tag {
       display: inline-flex;
       align-items: center;
@@ -463,6 +461,63 @@
       padding: 3px 9px;
       margin-top: 8px;
     }
+    .card-note {
+      font-size: 12.5px;
+      color: #666;
+      font-style: italic;
+      margin-top: 6px;
+      line-height: 1.45;
+    }
+
+    /* ── Intent note step ──────────────────────── */
+    #intent-note-step { display: flex; flex-direction: column; gap: 10px; }
+    #intent-note-step.hidden { display: none; }
+    #note-input {
+      width: 100%;
+      background: #111114;
+      border: 1px solid #2a2a2e;
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 10px 12px;
+      resize: none;
+      font-family: inherit;
+      outline: none;
+      min-height: 76px;
+    }
+    #note-input:focus { border-color: #3a3a3e; }
+    #note-input::placeholder { color: #444; }
+    .note-actions {
+      display: flex;
+      gap: 8px;
+    }
+    #note-skip-btn {
+      flex: 1;
+      padding: 11px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      background: #1f1f23;
+      color: var(--muted);
+      -webkit-tap-highlight-color: transparent;
+    }
+    #note-save-btn {
+      flex: 1;
+      padding: 11px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      background: var(--text);
+      color: var(--bg);
+      -webkit-tap-highlight-color: transparent;
+    }
+    #note-skip-btn:active { background: #2a2a2e; }
+    #note-save-btn:active { background: #ccc; }
 
     /* ── Intent bottom sheet ───────────────────── */
     #intent-overlay {
@@ -561,6 +616,7 @@
   <div id="tabs">
     <button class="tab active" data-tab="feed">Feed <span class="badge" id="feed-count">—</span></button>
     <button class="tab" data-tab="saved">Saved <span class="badge" id="saved-count">0</span></button>
+    <button class="tab" data-tab="read-later">Read Later <span class="badge" id="read-later-count">0</span></button>
   </div>
 </div>
 
@@ -577,6 +633,13 @@
       <button class="intent-opt" data-tag="💼 Work relevant"><span class="emoji">💼</span> Work relevant</button>
       <button class="intent-opt" data-tag="🗣️ Share"><span class="emoji">🗣️</span> Share</button>
     </div>
+    <div id="intent-note-step" class="hidden">
+      <textarea id="note-input" placeholder="Add your thought…"></textarea>
+      <div class="note-actions">
+        <button id="note-skip-btn">Skip</button>
+        <button id="note-save-btn">Save</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -586,9 +649,9 @@
 </div>
 
 <div id="feed-page" class="feed-page">
-  <div id="daily-brief" class="hidden">
-    <span class="brief-icon">✦</span>
-    <span id="brief-text"></span>
+  <div id="carta" class="hidden">
+    <div id="carta-label">Carta do Momento</div>
+    <p id="carta-text"></p>
   </div>
   <!-- cards rendered here -->
 </div>
@@ -603,6 +666,10 @@
 
 <div id="saved-page" class="feed-page hidden">
   <!-- saved cards rendered here -->
+</div>
+
+<div id="read-later-page" class="feed-page hidden">
+  <!-- read-later cards rendered here -->
 </div>
 
 <script>
@@ -695,9 +762,12 @@ function buildCard(card) {
        </div>`
     : '';
 
-  const savedCard = savedIds.has(card.id) ? savedCardsMap.get(card.id) : null;
+  const savedCard = savedCardsMap.get(card.id) || null;
   const tagHTML = savedCard?.saveTag
     ? `<span class="save-tag">${savedCard.saveTag}</span>`
+    : '';
+  const noteHTML = savedCard?.note
+    ? `<p class="card-note">${savedCard.note}</p>`
     : '';
 
   el.innerHTML = `
@@ -719,6 +789,7 @@ function buildCard(card) {
         <a class="read-link" href="${card.link}" target="_blank" rel="noopener" aria-label="Read article">Read ${ARROW_SVG}</a>
       </div>
       ${tagHTML}
+      ${noteHTML}
     </div>
   `;
 
@@ -741,8 +812,9 @@ function buildCard(card) {
       btn.innerHTML = BOOKMARK_EMPTY;
       btn.classList.remove('saved');
       btn.setAttribute('aria-label', 'Save');
-      updateSavedBadge();
+      updateBadges();
       if (activeTab === 'saved') renderSavedPage();
+      else if (activeTab === 'read-later') renderReadLaterPage();
     } else {
       openIntentSheet(card, el);
     }
@@ -785,20 +857,20 @@ const io = new IntersectionObserver(entries => {
 
 function renderFeedPage(cards, dailyBrief) {
   const page = document.getElementById('feed-page');
-  // Rebuild brief + placeholder so we don't lose the element on innerHTML wipe
-  const briefEl = document.getElementById('daily-brief') || (() => {
-    const d = document.createElement('div'); d.id = 'daily-brief'; d.className = 'hidden';
-    d.innerHTML = '<span class="brief-icon">✦</span><span id="brief-text"></span>';
+  // Preserve #carta element across innerHTML wipes
+  const cartaEl = document.getElementById('carta') || (() => {
+    const d = document.createElement('div'); d.id = 'carta'; d.className = 'hidden';
+    d.innerHTML = '<div id="carta-label">Carta do Momento</div><p id="carta-text"></p>';
     return d;
   })();
   page.innerHTML = '';
-  page.appendChild(briefEl);
+  page.appendChild(cartaEl);
 
   if (dailyBrief) {
-    document.getElementById('brief-text').textContent = dailyBrief;
-    briefEl.classList.remove('hidden');
+    document.getElementById('carta-text').textContent = dailyBrief;
+    cartaEl.classList.remove('hidden');
   } else {
-    briefEl.classList.add('hidden');
+    cartaEl.classList.add('hidden');
   }
 
   cards.forEach((c, i) => {
@@ -812,24 +884,17 @@ function renderFeedPage(cards, dailyBrief) {
   document.getElementById('end-of-feed').classList.remove('hidden');
 }
 
+const READ_LATER_TAG = '📌 Read later';
+
 function renderSavedPage() {
   const page = document.getElementById('saved-page');
   page.innerHTML = '';
-
-  const saved = feedCards.filter(c => savedIds.has(c.id));
-
-  if (saved.length === 0) {
-    page.innerHTML = `
-      <div id="empty-saved">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
-        </svg>
-        <p>Nothing saved yet.<br>Tap the bookmark on any card.</p>
-      </div>`;
+  const cards = [...savedCardsMap.values()].filter(c => c.saveTag !== READ_LATER_TAG);
+  if (cards.length === 0) {
+    page.innerHTML = emptyHTML('Nothing saved yet.<br>Tap the bookmark on any card.');
     return;
   }
-
-  saved.forEach((c, i) => {
+  cards.forEach((c, i) => {
     const el = buildCard(c);
     el.style.transitionDelay = `${Math.min(i * 40, 200)}ms`;
     page.appendChild(el);
@@ -837,11 +902,36 @@ function renderSavedPage() {
   });
 }
 
+function renderReadLaterPage() {
+  const page = document.getElementById('read-later-page');
+  page.innerHTML = '';
+  const cards = [...savedCardsMap.values()].filter(c => c.saveTag === READ_LATER_TAG);
+  if (cards.length === 0) {
+    page.innerHTML = emptyHTML('Nothing queued.<br>Save articles with 📌 Read later.');
+    return;
+  }
+  cards.forEach((c, i) => {
+    const el = buildCard(c);
+    el.style.transitionDelay = `${Math.min(i * 40, 200)}ms`;
+    page.appendChild(el);
+    io.observe(el);
+  });
+}
+
+function emptyHTML(msg) {
+  return `<div id="empty-saved">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+    </svg>
+    <p>${msg}</p>
+  </div>`;
+}
+
 // ─────────────────────────────────────────────
 // Save / unsave
 // ─────────────────────────────────────────────
-async function saveCard(card, saveTag) {
-  const record = { ...card, saveTag };
+async function saveCard(card, saveTag, note = '') {
+  const record = { ...card, saveTag, note };
   savedIds.add(card.id);
   savedCardsMap.set(card.id, record);
   await dbPut(record);
@@ -853,8 +943,11 @@ async function unsaveCard(id) {
   await dbDelete(id);
 }
 
-function updateSavedBadge() {
-  document.getElementById('saved-count').textContent = savedIds.size || '0';
+function updateBadges() {
+  const rl = [...savedCardsMap.values()].filter(c => c.saveTag === READ_LATER_TAG).length;
+  const sv = savedCardsMap.size - rl;
+  document.getElementById('saved-count').textContent = sv || '0';
+  document.getElementById('read-later-count').textContent = rl || '0';
 }
 
 // ─────────────────────────────────────────────
@@ -862,17 +955,37 @@ function updateSavedBadge() {
 // ─────────────────────────────────────────────
 let intentCard = null;
 let intentCardEl = null;
+let pendingTag = null;
 
 function openIntentSheet(card, el) {
   intentCard = card;
   intentCardEl = el;
+  pendingTag = null;
+  // Reset to step 1
+  document.getElementById('intent-options').classList.remove('hidden');
+  document.getElementById('intent-note-step').classList.add('hidden');
+  document.getElementById('intent-title').textContent = 'Save as…';
+  document.getElementById('note-input').value = '';
   document.getElementById('intent-overlay').classList.add('open');
 }
 
 function closeIntentSheet() {
   document.getElementById('intent-overlay').classList.remove('open');
-  intentCard = null;
-  intentCardEl = null;
+  intentCard = null; intentCardEl = null; pendingTag = null;
+}
+
+async function finishSave(note) {
+  const card = intentCard, el = intentCardEl, tag = pendingTag;
+  closeIntentSheet();
+  if (!card || !el || !tag) return;
+  await saveCard(card, tag, note);
+  const saveBtn = el.querySelector('.save-btn');
+  saveBtn.innerHTML = BOOKMARK_FILLED;
+  saveBtn.classList.add('saved');
+  saveBtn.setAttribute('aria-label', 'Unsave');
+  updateBadges();
+  if (activeTab === 'saved') renderSavedPage();
+  else if (activeTab === 'read-later') renderReadLaterPage();
 }
 
 document.getElementById('intent-overlay').addEventListener('click', e => {
@@ -880,23 +993,24 @@ document.getElementById('intent-overlay').addEventListener('click', e => {
 });
 document.getElementById('intent-close').addEventListener('click', closeIntentSheet);
 
+// Step 1 — pick intent
 document.querySelectorAll('.intent-opt').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    const tag = btn.dataset.tag;
-    const card = intentCard;
-    const el = intentCardEl;
-    closeIntentSheet();
-    if (!card || !el) return;
-
-    await saveCard(card, tag);
-    const saveBtn = el.querySelector('.save-btn');
-    saveBtn.innerHTML = BOOKMARK_FILLED;
-    saveBtn.classList.add('saved');
-    saveBtn.setAttribute('aria-label', 'Unsave');
-    updateSavedBadge();
-    if (activeTab === 'saved') renderSavedPage();
+  btn.addEventListener('click', () => {
+    pendingTag = btn.dataset.tag;
+    document.getElementById('intent-options').classList.add('hidden');
+    document.getElementById('intent-note-step').classList.remove('hidden');
+    document.getElementById('intent-title').textContent = 'Add a note (optional)';
+    document.getElementById('note-input').focus();
   });
 });
+
+// Step 2 — note + confirm
+document.getElementById('note-save-btn').addEventListener('click', () =>
+  finishSave(document.getElementById('note-input').value.trim())
+);
+document.getElementById('note-skip-btn').addEventListener('click', () =>
+  finishSave('')
+);
 
 // ─────────────────────────────────────────────
 // Fetch feed
@@ -934,12 +1048,12 @@ document.querySelectorAll('.tab').forEach(tab => {
     const name = tab.dataset.tab;
     if (name === activeTab) return;
     activeTab = name;
-
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
     document.getElementById('feed-page').classList.toggle('hidden', name !== 'feed');
     document.getElementById('saved-page').classList.toggle('hidden', name !== 'saved');
-
+    document.getElementById('read-later-page').classList.toggle('hidden', name !== 'read-later');
     if (name === 'saved') renderSavedPage();
+    else if (name === 'read-later') renderReadLaterPage();
   });
 });
 
@@ -1004,7 +1118,7 @@ document.getElementById('more-btn').addEventListener('click', async () => {
   db = await openDB();
   const savedArr = await dbGetAll();
   savedArr.forEach(c => { savedIds.add(c.id); savedCardsMap.set(c.id, c); });
-  updateSavedBadge();
+  updateBadges();
   await loadFeed();
 })();
 
