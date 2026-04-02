@@ -868,6 +868,22 @@
     }
     .style-opt-label { flex: 1; font-weight: 500; }
     .style-opt-desc { font-size: 11.5px; color: #555; margin-top: 1px; }
+    #interest-brief-input {
+      width: 100%;
+      background: #111114;
+      border: 1px solid #2a2a2e;
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 13.5px;
+      line-height: 1.55;
+      padding: 10px 12px;
+      resize: none;
+      font-family: inherit;
+      outline: none;
+      min-height: 72px;
+    }
+    #interest-brief-input:focus { border-color: #3a3a3e; }
+    #interest-brief-input::placeholder { color: #444; }
 
     /* ── Connections block (Notes tab) ─────────── */
     #connections-block {
@@ -978,6 +994,10 @@
         <span><div class="style-opt-label">Casual</div><div class="style-opt-desc">Like a smart friend explaining it</div></span>
       </button>
     </div>
+    <p class="settings-section-label" style="margin-top:20px">What are you interested in?</p>
+    <textarea id="interest-brief-input"
+      placeholder="e.g. AI startups in Europe, Brazilian fintech, F1, climate tech…"
+    ></textarea>
   </div>
 </div>
 
@@ -1160,6 +1180,7 @@ let activeTab = 'feed';
 let notesArr = []; // [{id, text, ts}] sorted newest-first
 let signals = []; // [{id, type:'save'|'read', topic, intent?, ts}]
 let readingStyle = 'direct'; // persisted in settings
+let interestBrief = ''; // persisted in settings as interest_brief
 let currentConnections = null; // cached connections result
 
 // ─────────────────────────────────────────────
@@ -1635,10 +1656,10 @@ document.getElementById('note-skip-btn').addEventListener('click', () =>
 const settingsOverlay = document.getElementById('settings-overlay');
 
 function openSettingsSheet() {
-  // Reflect current style
   document.querySelectorAll('.style-opt').forEach(b =>
     b.classList.toggle('selected', b.dataset.style === readingStyle)
   );
+  document.getElementById('interest-brief-input').value = interestBrief;
   settingsOverlay.classList.add('open');
 }
 
@@ -1660,6 +1681,13 @@ document.querySelectorAll('.style-opt').forEach(btn => {
     );
     await dbPutSetting('reading_style', readingStyle);
   });
+});
+
+let briefSaveTimer = null;
+document.getElementById('interest-brief-input').addEventListener('input', e => {
+  interestBrief = e.target.value;
+  clearTimeout(briefSaveTimer);
+  briefSaveTimer = setTimeout(() => dbPutSetting('interest_brief', interestBrief).catch(() => {}), 600);
 });
 
 // ─────────────────────────────────────────────
@@ -1722,6 +1750,7 @@ async function loadFeed() {
     const pref = computePreferredTopics();
     if (pref.length > 0) params.set('pref', pref.join(','));
     params.set('style', readingStyle);
+    if (interestBrief.trim()) params.set('brief', interestBrief.trim().slice(0, 300));
     // Pass last 10 saved headlines for duplicate detection
     const recentHeadlines = [...savedCardsMap.values()]
       .slice(-10)
@@ -1823,16 +1852,18 @@ document.getElementById('more-btn').addEventListener('click', async () => {
 // ─────────────────────────────────────────────
 (async () => {
   db = await openDB();
-  const [savedArr, notesFromDB, signalsFromDB, storedStyle] = await Promise.all([
+  const [savedArr, notesFromDB, signalsFromDB, storedStyle, storedBrief] = await Promise.all([
     dbGetAll(),
     dbGetAllNotes(),
     dbGetAllSignals(),
     dbGetSetting('reading_style'),
+    dbGetSetting('interest_brief'),
   ]);
   savedArr.forEach(c => { savedIds.add(c.id); savedCardsMap.set(c.id, c); });
   notesArr = notesFromDB.sort((a, b) => b.ts - a.ts);
   signals = signalsFromDB;
   if (storedStyle) readingStyle = storedStyle;
+  if (storedBrief) interestBrief = storedBrief;
   updateBadges();
   await loadFeed();
 })();
