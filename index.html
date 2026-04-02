@@ -446,6 +446,16 @@
       color: #bbb;
       font-style: italic;
     }
+    #carta-read-more {
+      display: inline;
+      color: #666;
+      font-style: normal;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      border-bottom: 1px solid #444;
+    }
+    #carta-read-more:hover { color: #999; }
 
     /* ── Save tag pill + note ──────────────────── */
     .save-tag {
@@ -867,7 +877,31 @@ function renderFeedPage(cards, dailyBrief) {
   page.appendChild(cartaEl);
 
   if (dailyBrief) {
-    document.getElementById('carta-text').textContent = dailyBrief;
+    const cartaText = document.getElementById('carta-text');
+    const TRUNCATE = 180;
+    if (dailyBrief.length > TRUNCATE) {
+      const preview = dailyBrief.slice(0, TRUNCATE).trimEnd();
+      const rest = dailyBrief.slice(TRUNCATE);
+      const restSpan = document.createElement('span');
+      restSpan.textContent = rest;
+      restSpan.style.display = 'none';
+      const ellipsis = document.createTextNode('… ');
+      const readMore = document.createElement('span');
+      readMore.id = 'carta-read-more';
+      readMore.textContent = 'Read more';
+      readMore.addEventListener('click', () => {
+        restSpan.style.display = 'inline';
+        ellipsis.textContent = '';
+        readMore.remove();
+      });
+      cartaText.textContent = '';
+      cartaText.appendChild(document.createTextNode(preview));
+      cartaText.appendChild(restSpan);
+      cartaText.appendChild(ellipsis);
+      cartaText.appendChild(readMore);
+    } else {
+      cartaText.textContent = dailyBrief;
+    }
     cartaEl.classList.remove('hidden');
   } else {
     cartaEl.classList.add('hidden');
