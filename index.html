@@ -1350,26 +1350,25 @@ function renderFeedPage(cards, dailyBrief) {
 
   if (dailyBrief) {
     const cartaText = document.getElementById('carta-text');
-    const TRUNCATE = 180;
-    if (dailyBrief.length > TRUNCATE) {
-      const preview = dailyBrief.slice(0, TRUNCATE).trimEnd();
-      const rest = dailyBrief.slice(TRUNCATE);
+    // Split into sentences and truncate at 3
+    const sentenceRe = /[^.!?]*[.!?]+(\s|$)/g;
+    const sentences = dailyBrief.match(sentenceRe) || [dailyBrief];
+    const preview = sentences.slice(0, 3).join('').trimEnd();
+    const rest = dailyBrief.slice(preview.length).trimStart();
+    if (rest) {
       const restSpan = document.createElement('span');
-      restSpan.textContent = rest;
+      restSpan.textContent = ' ' + rest;
       restSpan.style.display = 'none';
-      const ellipsis = document.createTextNode('… ');
       const readMore = document.createElement('span');
       readMore.id = 'carta-read-more';
-      readMore.textContent = 'Read more';
+      readMore.textContent = ' Read more';
       readMore.addEventListener('click', () => {
         restSpan.style.display = 'inline';
-        ellipsis.textContent = '';
         readMore.remove();
       });
       cartaText.textContent = '';
       cartaText.appendChild(document.createTextNode(preview));
       cartaText.appendChild(restSpan);
-      cartaText.appendChild(ellipsis);
       cartaText.appendChild(readMore);
     } else {
       cartaText.textContent = dailyBrief;

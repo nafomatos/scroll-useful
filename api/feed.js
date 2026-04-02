@@ -11,15 +11,23 @@ const MAX_PER_TOPIC = 2;
 const MAX_TEXT_CHARS = 1500;
 const SCRAPE_TIMEOUT_MS = 7000;
 
+// Override RSS search query for topics where the bare topic name returns poor results
+const TOPIC_QUERY = {
+  sports:  'football soccer Palmeiras "Premier League" "Champions League" "Serie A"',
+  science: 'science research discovery breakthrough',
+};
+
 const rssParser = new Parser({ timeout: 8000 });
 const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 3 });
 
 // Google News RSS URLs — one English (US), one Portuguese (BR)
 function rssUrlEN(topic) {
-  return `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}&hl=en-US&gl=US&ceid=US:en`;
+  const q = TOPIC_QUERY[topic] || topic;
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=en-US&gl=US&ceid=US:en`;
 }
 function rssUrlPT(topic) {
-  return `https://news.google.com/rss/search?q=${encodeURIComponent(topic)}&hl=pt-BR&gl=BR&ceid=BR:pt`;
+  const q = TOPIC_QUERY[topic] || topic;
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=pt-BR&gl=BR&ceid=BR:pt`;
 }
 
 // Google News titles are "Headline - Publisher". Strip the publisher suffix.
