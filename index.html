@@ -984,6 +984,112 @@
       font-style: italic;
     }
 
+    /* ── Fixture card ──────────────────────────── */
+    .fixture-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px 16px;
+      margin-bottom: 12px;
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity .35s ease, transform .35s ease;
+      cursor: default;
+    }
+    .fixture-card.visible { opacity: 1; transform: translateY(0); }
+    .fixture-league-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 12px;
+    }
+    .fixture-league-logo {
+      width: 16px; height: 16px;
+      object-fit: contain;
+      opacity: .75;
+    }
+    .fixture-league-name {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #555;
+    }
+    .fixture-match {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .fixture-team {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 7px;
+      text-align: center;
+    }
+    .fixture-team-logo {
+      width: 36px; height: 36px;
+      object-fit: contain;
+    }
+    .fixture-team-logo-placeholder {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: #222;
+    }
+    .fixture-team-name {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.25;
+      max-width: 90px;
+    }
+    .fixture-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      min-width: 64px;
+    }
+    .fixture-score-value {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: 3px;
+      line-height: 1;
+    }
+    .fixture-vs {
+      font-size: 13px;
+      font-weight: 700;
+      color: #333;
+      letter-spacing: .05em;
+    }
+    .fixture-time-label {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 500;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .fixture-live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #ef4444;
+      letter-spacing: .04em;
+    }
+    .fixture-live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #ef4444;
+      animation: fxpulse 1.4s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    @keyframes fxpulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
     /* scrollbar */
     ::-webkit-scrollbar { width: 0; }
   </style>
@@ -1874,6 +1980,99 @@ captureSaveBtn.addEventListener('click', async () => {
 });
 
 // ─────────────────────────────────────────────
+// Fixture cards
+// ─────────────────────────────────────────────
+function buildFixtureCard(fixture) {
+  const el = document.createElement('article');
+  el.className = 'fixture-card tag-sports';
+
+  const leagueLogoHTML = fixture.leagueLogo
+    ? `<img class="fixture-league-logo" src="${fixture.leagueLogo}" alt="" loading="lazy">`
+    : '';
+
+  const logoEl = (src) => src
+    ? `<img class="fixture-team-logo" src="${src}" alt="" loading="lazy">`
+    : `<div class="fixture-team-logo-placeholder"></div>`;
+
+  let centerHTML;
+  if (fixture.status === 'live') {
+    const elapsed = fixture.elapsed != null ? `${fixture.elapsed}'` : 'LIVE';
+    centerHTML = `
+      <div class="fixture-score-value">${fixture.homeScore ?? 0}&thinsp;–&thinsp;${fixture.awayScore ?? 0}</div>
+      <div class="fixture-live-indicator"><span class="fixture-live-dot"></span>${elapsed}</div>`;
+  } else if (fixture.status === 'finished') {
+    centerHTML = `
+      <div class="fixture-score-value">${fixture.homeScore ?? 0}&thinsp;–&thinsp;${fixture.awayScore ?? 0}</div>
+      <div class="fixture-time-label">FT</div>`;
+  } else if (fixture.status === 'postponed') {
+    centerHTML = `
+      <div class="fixture-vs">PST</div>
+      <div class="fixture-time-label">Postponed</div>`;
+  } else {
+    centerHTML = `
+      <div class="fixture-vs">vs</div>
+      <div class="fixture-time-label">${fixture.kickoff}</div>`;
+  }
+
+  el.innerHTML = `
+    <div class="fixture-league-row">
+      ${leagueLogoHTML}
+      <span class="fixture-league-name">${fixture.league}</span>
+    </div>
+    <div class="fixture-match">
+      <div class="fixture-team">
+        ${logoEl(fixture.homeLogo)}
+        <div class="fixture-team-name">${fixture.homeTeam}</div>
+      </div>
+      <div class="fixture-center">${centerHTML}</div>
+      <div class="fixture-team">
+        ${logoEl(fixture.awayLogo)}
+        <div class="fixture-team-name">${fixture.awayTeam}</div>
+      </div>
+    </div>
+  `;
+
+  // Self-contained — tapping does nothing
+  el.addEventListener('click', e => e.stopPropagation());
+
+  return el;
+}
+
+async function loadFixtures() {
+  try {
+    const res = await fetch('/api/sports');
+    if (!res.ok) return;
+    const data = await res.json();
+    const fixtures = data.fixtures || [];
+    if (fixtures.length === 0) return;
+
+    const page = document.getElementById('feed-page');
+    // Only inject into the feed tab's regular card list
+    const cards = [...page.querySelectorAll('.card')];
+    if (cards.length === 0) return;
+
+    // Spread fixtures evenly through the cards, starting after the 3rd card
+    // and then every ~4 cards, up to however many fixtures we have
+    const step = Math.max(3, Math.floor(cards.length / Math.min(fixtures.length, 6)));
+    let cardIdx = 2; // insert after 3rd card (0-indexed)
+    let injected = 0;
+
+    for (const fixture of fixtures) {
+      if (cardIdx >= cards.length) break;
+      const refCard = cards[cardIdx];
+      const el = buildFixtureCard(fixture);
+      el.style.transitionDelay = `${injected * 60}ms`;
+      page.insertBefore(el, refCard.nextSibling);
+      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
+      cardIdx += step;
+      injected++;
+    }
+  } catch (err) {
+    console.warn('Fixtures load failed:', err.message);
+  }
+}
+
+// ─────────────────────────────────────────────
 // Fetch feed
 // ─────────────────────────────────────────────
 async function loadFeed() {
@@ -1907,6 +2106,8 @@ async function loadFeed() {
     // Silently filter duplicate cards
     feedCards = (data.cards || []).filter(c => !c.duplicate);
     renderFeedPage(feedCards, data.daily_brief || '');
+    // Inject fixture cards async — doesn't block feed display
+    loadFixtures().catch(() => {});
   } catch (err) {
     page.innerHTML = '';
     document.getElementById('error-msg').textContent = `Failed to load feed: ${err.message}`;
