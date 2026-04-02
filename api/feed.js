@@ -191,8 +191,15 @@ async function scrapeArticle(url) {
   }
 }
 
+const STYLE_INSTRUCTIONS = {
+  direct:     'Write summaries that are concise and to the point — no fluff, key facts only.',
+  narrative:  'Write summaries with a narrative flow — give context and connect events to a bigger picture.',
+  analytical: 'Write summaries with analytical depth — surface implications, tensions, and what to watch.',
+  casual:     'Write summaries in a casual, conversational tone — like explaining it to a smart friend.',
+};
+
 // Ask Claude to summarise all articles in one shot and return JSON array.
-async function summariseAll(articles) {
+async function summariseAll(articles, style = 'direct', seenHeadlines = []) {
   const numbered = articles
     .map(
       (a, i) =>
@@ -200,44 +207,38 @@ async function summariseAll(articles) {
     )
     .join('\n\n---\n\n');
 
+  const styleNote = STYLE_INSTRUCTIONS[style] || STYLE_INSTRUCTIONS.direct;
+
+  const seenSection = seenHeadlines.length > 0
+    ? `\n\nPREVIOUSLY SEEN HEADLINES — if any new article covers the exact same story as one of these, set "duplicate":true for that article:\n${seenHeadlines.map((h, i) => `${i + 1}. ${h}`).join('\n')}`
+    : '';
+
   const prompt = `You are a sharp morning briefing editor. For each article below write a 2-3 sentence summary in ENGLISH. Even if the article is in Portuguese, write in English.
 
-Also write a "daily_brief" — 3 to 4 sentences written like an insightful morning editorial. Don't just list headlines. Connect the dots between topics, surface the tension or irony between stories, give the reader a sense of what's really happening across the day. Be conversational and specific. Example tone: "Markets are reacting nervously to tech layoffs while AI startups paradoxically raise record rounds — a tension worth watching today. Science quietly published a materials breakthrough that most feeds will bury under the noise. Sports is in full managerial shakeup mode, which usually signals a deeper frustration with ownership."
+STYLE: ${styleNote}
+
+Also write a "daily_brief" — 3 to 4 sentences written like an insightful morning editorial. Don't just list headlines. Connect the dots between topics, surface the tension or irony between stories, give the reader a sense of what's really happening across the day. Be conversational and specific.${seenSection}
 
 Return ONLY a valid JSON object — no markdown fences — in this exact shape:
-{"daily_brief":"...","summaries":[{"id":0,"summary":"..."},{"id":1,"summary":"..."},...]}
+{"daily_brief":"...","summaries":[{"id":0,"summary":"...","duplicate":false},{"id":1,"summary":"...","duplicate":false},...]}
+
+Only set "duplicate":true when the article covers the exact same news event as a previously seen headline. Different angles on the same broad topic do NOT count as duplicates.
 
 Articles:
 
 ${numbered}`;
 
-  let msg;
-  try {
-    msg = await claude.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 4096,
-      messages: [{ role: 'user', content: prompt }],
-    });
-  } catch (err) {
-    // Fall back to Haiku if Sonnet is overloaded (529) or rate-limited (429)
-    if (err.status === 529 || err.status === 429) {
-      console.warn('Sonnet overloaded, falling back to Haiku');
-      msg = await claude.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4096,
-        messages: [{ role: 'user', content: prompt }],
-      });
-    } else {
-      throw err;
-    }
-  }
+  const msg = await claude.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 4096,
+    messages: [{ role: 'user', content: prompt }],
+  });
 
   const raw = (msg.content[0]?.text || '').trim();
 
-  // Parse the new envelope shape; fall back gracefully
+  // Parse the envelope shape; fall back gracefully
   try {
     const parsed = JSON.parse(raw);
-    // Handle both new {daily_brief, summaries:[]} and legacy [] shapes
     if (Array.isArray(parsed)) return { daily_brief: '', summaries: parsed };
     return { daily_brief: parsed.daily_brief || '', summaries: parsed.summaries || [] };
   } catch {
@@ -268,14 +269,28 @@ module.exports = async function handler(req, res) {
 
   res.setHeader('Access-Control-Allow-Origin', '*');
 
-  // Single-topic "more" mode vs full feed mode
+  // Parse query params
   const requestedTopic = req.query && req.query.topic;
   const singleTopic = requestedTopic && TOPICS.includes(requestedTopic) ? requestedTopic : null;
 
-  // Single-topic results are fresh on every request; full feed is cached 2 h
+  const prefRaw = req.query && req.query.pref;
+  const preferredTopics = prefRaw
+    ? prefRaw.split(',').map(t => t.trim()).filter(t => TOPICS.includes(t)).slice(0, 2)
+    : [];
+
+  const seenRaw = req.query && req.query.seen;
+  const seenHeadlines = seenRaw
+    ? decodeURIComponent(seenRaw).split('|').map(h => h.trim()).filter(Boolean).slice(0, 10)
+    : [];
+
+  const styleRaw = req.query && req.query.style;
+  const style = Object.keys(STYLE_INSTRUCTIONS).includes(styleRaw) ? styleRaw : 'direct';
+
+  // Personalized requests are not shared-cached; default full feed is cached 2 h
+  const isPersonalized = preferredTopics.length > 0 || seenHeadlines.length > 0;
   res.setHeader(
     'Cache-Control',
-    singleTopic ? 'no-store' : 's-maxage=7200, stale-while-revalidate=600',
+    (singleTopic || isPersonalized) ? 'no-store' : 's-maxage=7200, stale-while-revalidate=600',
   );
 
   try {
@@ -290,31 +305,28 @@ module.exports = async function handler(req, res) {
       if (articles.length === 0) {
         return res.status(502).json({ error: 'No articles fetched from RSS feeds.' });
       }
-      // Scrape article thumbnails + text
       const scraped = await Promise.allSettled(articles.map(a => scrapeArticle(a.link)));
       const rich = articles.map((a, i) => ({
         ...a,
         text:      scraped[i].status === 'fulfilled' ? scraped[i].value.text      : '',
         thumbnail: scraped[i].status === 'fulfilled' ? scraped[i].value.thumbnail : null,
       }));
-      // Insert video at position 2 for a natural feel
       if (video && rich.length >= 2) rich.splice(2, 0, video);
       else if (video) rich.push(video);
       allItems = rich;
 
     } else {
       // ── Full feed mode ─────────────────────────────────────────────────────
-      // Fetch articles + videos for all topics in parallel
+      // Preferred topics get 3 EN articles; others get 1
       const [articleBatches, videoResults] = await Promise.all([
-        Promise.all(TOPICS.map(t => fetchTopicArticles(t, 1))),
+        Promise.all(TOPICS.map(t => fetchTopicArticles(t, preferredTopics.includes(t) ? 3 : 1))),
         Promise.all(TOPICS.map(t => fetchTopicVideo(t))),
       ]);
-      const articles = articleBatches.flat(); // up to 14 articles
+      const articles = articleBatches.flat();
       if (articles.length === 0) {
         return res.status(502).json({ error: 'No articles fetched from RSS feeds.' });
       }
 
-      // Scrape article thumbnails + text (videos already have YT thumbnails)
       const scraped = await Promise.allSettled(articles.map(a => scrapeArticle(a.link)));
       const articlesRich = articles.map((a, i) => ({
         ...a,
@@ -322,7 +334,6 @@ module.exports = async function handler(req, res) {
         thumbnail: scraped[i].status === 'fulfilled' ? scraped[i].value.thumbnail : null,
       }));
 
-      // Interleave per topic: [EN article, PT article, video] for each topic
       const videoByTopic = Object.fromEntries(
         videoResults.filter(Boolean).map(v => [v.topic, v])
       );
@@ -333,23 +344,27 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // 2. Single Claude call — summaries for every item (articles + videos)
-    const { daily_brief, summaries } = await summariseAll(allItems);
-    const summaryMap = Object.fromEntries(summaries.map((s) => [s.id, s.summary]));
+    // 2. Single Claude call — summaries + duplicate detection
+    const { daily_brief, summaries } = await summariseAll(allItems, style, seenHeadlines);
+    const summaryMap = Object.fromEntries(summaries.map(s => [s.id, s]));
 
     // 3. Build response cards
-    const cards = allItems.map((item, i) => ({
-      id: `${item.topic}-${item.type || 'article'}-${i}`,
-      topic: item.topic,
-      type: item.type || 'article',
-      headline: item.headline,
-      summary: summaryMap[i] || '',
-      source: item.source,
-      link: item.link,
-      pubDate: item.pubDate,
-      thumbnail: item.thumbnail || null,
-      saved: false,
-    }));
+    const cards = allItems.map((item, i) => {
+      const s = summaryMap[i] || {};
+      return {
+        id: `${item.topic}-${item.type || 'article'}-${i}`,
+        topic: item.topic,
+        type: item.type || 'article',
+        headline: item.headline,
+        summary: s.summary || '',
+        duplicate: s.duplicate === true,
+        source: item.source,
+        link: item.link,
+        pubDate: item.pubDate,
+        thumbnail: item.thumbnail || null,
+        saved: false,
+      };
+    });
 
     return res.status(200).json({
       daily_brief,

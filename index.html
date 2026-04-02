@@ -755,6 +755,151 @@
     #empty-notes svg { opacity: .25; }
     #empty-notes p { font-size: 14px; line-height: 1.5; }
 
+    /* ── Settings button ───────────────────────── */
+    #settings-btn {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: color .2s;
+      flex-shrink: 0;
+    }
+    #settings-btn svg { width: 15px; height: 15px; }
+    #header-actions { display: flex; gap: 8px; align-items: center; }
+
+    /* ── Settings bottom sheet ─────────────────── */
+    #settings-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 200;
+      display: flex;
+      align-items: flex-end;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease;
+    }
+    #settings-overlay.open { opacity: 1; pointer-events: all; }
+    #settings-sheet {
+      width: 100%;
+      background: #18181b;
+      border-radius: 20px 20px 0 0;
+      border-top: 1px solid #2a2a2e;
+      padding: 12px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+      transform: translateY(100%);
+      transition: transform .28s cubic-bezier(.32,1,.23,1);
+    }
+    #settings-overlay.open #settings-sheet { transform: translateY(0); }
+    .settings-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #222;
+    }
+    .settings-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    #settings-close {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: none;
+      background: #2a2a2e;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .settings-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: #444;
+      margin-bottom: 10px;
+    }
+    .style-options { display: flex; flex-direction: column; gap: 6px; }
+    .style-opt {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 14px;
+      border-radius: 12px;
+      border: 1px solid #222;
+      background: #111114;
+      cursor: pointer;
+      font-size: 13.5px;
+      color: var(--text);
+      transition: border-color .15s, background .15s;
+      -webkit-tap-highlight-color: transparent;
+      text-align: left;
+      width: 100%;
+    }
+    .style-opt:active { background: #1f1f23; }
+    .style-opt.selected {
+      border-color: rgba(255,255,255,.3);
+      background: rgba(255,255,255,.06);
+    }
+    .style-opt .style-radio {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      border: 2px solid #444;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color .15s;
+    }
+    .style-opt.selected .style-radio {
+      border-color: var(--text);
+      background: var(--text);
+    }
+    .style-opt.selected .style-radio::after {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--bg);
+    }
+    .style-opt-label { flex: 1; font-weight: 500; }
+    .style-opt-desc { font-size: 11.5px; color: #555; margin-top: 1px; }
+
+    /* ── Connections block (Notes tab) ─────────── */
+    #connections-block {
+      margin-bottom: 20px;
+      padding: 14px 16px;
+      border-left: 3px solid rgba(255,255,255,.1);
+      background: rgba(255,255,255,.02);
+      border-radius: 0 12px 12px 0;
+    }
+    #connections-block.hidden { display: none; }
+    #connections-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #444;
+      margin-bottom: 10px;
+    }
+    .connection-item {
+      font-size: 13px;
+      line-height: 1.65;
+      color: #999;
+      padding: 6px 0;
+      border-bottom: 1px solid #1a1a1d;
+    }
+    .connection-item:last-child { border-bottom: none; padding-bottom: 0; }
+    #connections-loading {
+      font-size: 12px;
+      color: #444;
+      font-style: italic;
+    }
+
     /* scrollbar */
     ::-webkit-scrollbar { width: 0; }
   </style>
@@ -764,11 +909,18 @@
 <div id="header">
   <div id="header-top">
     <div id="logo">Pulse</div>
-    <button id="refresh-btn" aria-label="Refresh">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-      </svg>
-    </button>
+    <div id="header-actions">
+      <button id="settings-btn" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+      <button id="refresh-btn" aria-label="Refresh">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+        </svg>
+      </button>
+    </div>
   </div>
   <div id="tabs">
     <button class="tab active" data-tab="feed">Feed <span class="badge" id="feed-count">—</span></button>
@@ -797,6 +949,34 @@
         <button id="note-skip-btn">Skip</button>
         <button id="note-save-btn">Save</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="settings-overlay">
+  <div id="settings-sheet">
+    <div class="settings-header">
+      <span class="settings-title">Reading style</span>
+      <button id="settings-close" aria-label="Close">×</button>
+    </div>
+    <p class="settings-section-label">How should Claude summarise articles?</p>
+    <div class="style-options">
+      <button class="style-opt" data-style="direct">
+        <span class="style-radio"></span>
+        <span><div class="style-opt-label">Direct &amp; concise</div><div class="style-opt-desc">Key facts only, no fluff</div></span>
+      </button>
+      <button class="style-opt" data-style="narrative">
+        <span class="style-radio"></span>
+        <span><div class="style-opt-label">Narrative &amp; contextual</div><div class="style-opt-desc">Story-driven, bigger picture</div></span>
+      </button>
+      <button class="style-opt" data-style="analytical">
+        <span class="style-radio"></span>
+        <span><div class="style-opt-label">Analytical</div><div class="style-opt-desc">Implications, tensions, what to watch</div></span>
+      </button>
+      <button class="style-opt" data-style="casual">
+        <span class="style-radio"></span>
+        <span><div class="style-opt-label">Casual</div><div class="style-opt-desc">Like a smart friend explaining it</div></span>
+      </button>
     </div>
   </div>
 </div>
@@ -857,7 +1037,8 @@
 // ─────────────────────────────────────────────
 // IndexedDB
 // ─────────────────────────────────────────────
-const DB_NAME = 'pulse-db', DB_VER = 2, STORE = 'saved', NOTES_STORE = 'notes';
+const DB_NAME = 'pulse-db', DB_VER = 3, STORE = 'saved', NOTES_STORE = 'notes';
+const SIGNALS_STORE = 'signals', SETTINGS_STORE = 'settings';
 let db = null;
 
 function openDB() {
@@ -869,6 +1050,10 @@ function openDB() {
         d.createObjectStore(STORE, { keyPath: 'id' });
       if (!d.objectStoreNames.contains(NOTES_STORE))
         d.createObjectStore(NOTES_STORE, { keyPath: 'id' });
+      if (!d.objectStoreNames.contains(SIGNALS_STORE))
+        d.createObjectStore(SIGNALS_STORE, { keyPath: 'id' });
+      if (!d.objectStoreNames.contains(SETTINGS_STORE))
+        d.createObjectStore(SETTINGS_STORE, { keyPath: 'key' });
     };
     r.onsuccess = e => res(e.target.result);
     r.onerror = e => rej(e.target.error);
@@ -929,6 +1114,42 @@ function dbDeleteNote(id) {
   });
 }
 
+function dbPutSignal(signal) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(SIGNALS_STORE, 'readwrite');
+    tx.objectStore(SIGNALS_STORE).put(signal);
+    tx.oncomplete = () => res();
+    tx.onerror = e => rej(e.target.error);
+  });
+}
+
+function dbGetAllSignals() {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(SIGNALS_STORE, 'readonly');
+    const r = tx.objectStore(SIGNALS_STORE).getAll();
+    r.onsuccess = e => res(e.target.result);
+    r.onerror = e => rej(e.target.error);
+  });
+}
+
+function dbGetSetting(key) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(SETTINGS_STORE, 'readonly');
+    const r = tx.objectStore(SETTINGS_STORE).get(key);
+    r.onsuccess = e => res(e.target.result?.value ?? null);
+    r.onerror = e => rej(e.target.error);
+  });
+}
+
+function dbPutSetting(key, value) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(SETTINGS_STORE, 'readwrite');
+    tx.objectStore(SETTINGS_STORE).put({ key, value });
+    tx.oncomplete = () => res();
+    tx.onerror = e => rej(e.target.error);
+  });
+}
+
 // ─────────────────────────────────────────────
 // State
 // ─────────────────────────────────────────────
@@ -937,6 +1158,9 @@ let savedIds = new Set();
 let savedCardsMap = new Map(); // id → full card object (includes saveTag)
 let activeTab = 'feed';
 let notesArr = []; // [{id, text, ts}] sorted newest-first
+let signals = []; // [{id, type:'save'|'read', topic, intent?, ts}]
+let readingStyle = 'direct'; // persisted in settings
+let currentConnections = null; // cached connections result
 
 // ─────────────────────────────────────────────
 // Utils
@@ -950,6 +1174,25 @@ function timeAgo(dateStr) {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
+}
+
+// Returns top-2 preferred topics based on save (weight 2) + read (weight 1) signals
+function computePreferredTopics() {
+  const scores = {};
+  signals.forEach(s => {
+    if (!s.topic) return;
+    scores[s.topic] = (scores[s.topic] || 0) + (s.type === 'save' ? 2 : 1);
+  });
+  return Object.entries(scores)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([t]) => t);
+}
+
+function logSignal(type, topic, intent = null) {
+  const sig = { id: `sig-${Date.now()}-${Math.random().toString(36).slice(2,6)}`, type, topic, intent, ts: Date.now() };
+  signals.push(sig);
+  dbPutSignal(sig).catch(() => {});
 }
 
 const BOOKMARK_EMPTY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>`;
@@ -1035,8 +1278,11 @@ function buildCard(card) {
     }
   });
 
-  // card tap → open link
-  el.addEventListener('click', () => window.open(card.link, '_blank', 'noopener'));
+  // card tap → log read signal + open link
+  el.addEventListener('click', () => {
+    logSignal('read', card.topic);
+    window.open(card.link, '_blank', 'noopener');
+  });
 
   // prevent read-link double-open
   el.querySelector('.read-link').addEventListener('click', e => e.stopPropagation());
@@ -1209,24 +1455,91 @@ function buildNoteCard(note) {
   return el;
 }
 
+function renderConnectionsBlock(state) {
+  const block = document.getElementById('connections-block');
+  const list = document.getElementById('connections-list');
+  if (!block || !list) return;
+
+  if (state === 'loading') {
+    list.innerHTML = '<p id="connections-loading">Finding connections…</p>';
+    block.classList.remove('hidden');
+    return;
+  }
+  if (!state || state.length === 0) {
+    block.classList.add('hidden');
+    return;
+  }
+  list.innerHTML = state
+    .map(c => `<div class="connection-item">${c.replace(/</g, '&lt;')}</div>`)
+    .join('');
+  block.classList.remove('hidden');
+}
+
+async function checkAndTriggerConnections() {
+  // Need at least 5 notes and 10 saved cards
+  if (notesArr.length < 5 || savedCardsMap.size < 10) return;
+
+  // Check if already fetched this week
+  const lastDate = await dbGetSetting('last_connection_date').catch(() => null);
+  if (lastDate) {
+    const diffDays = (Date.now() - new Date(lastDate).getTime()) / 86400000;
+    if (diffDays < 7) {
+      // Use cached result if available
+      if (currentConnections) renderConnectionsBlock(currentConnections);
+      return;
+    }
+  }
+
+  // Trigger the call
+  renderConnectionsBlock('loading');
+  try {
+    const notes = notesArr.slice(0, 30).map(n => n.text);
+    const headlines = [...savedCardsMap.values()].slice(0, 30).map(c => c.headline).filter(Boolean);
+    const res = await fetch('/api/connections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes, headlines }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    currentConnections = data.connections || [];
+    await dbPutSetting('last_connection_date', new Date().toISOString());
+    renderConnectionsBlock(currentConnections);
+  } catch (err) {
+    console.warn('Connections fetch failed:', err.message);
+    renderConnectionsBlock(null);
+  }
+}
+
 function renderNotesPage() {
   const page = document.getElementById('notes-page');
   page.innerHTML = '';
+
+  // Connections block placeholder (always rendered; shown/hidden dynamically)
+  const connectionsEl = document.createElement('div');
+  connectionsEl.id = 'connections-block';
+  connectionsEl.className = 'hidden';
+  connectionsEl.innerHTML = '<div id="connections-label">🔗 Connections</div><div id="connections-list"></div>';
+  page.appendChild(connectionsEl);
+
   if (notesArr.length === 0) {
-    page.innerHTML = `<div id="empty-notes">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-      </svg>
-      <p>No notes yet.<br>Tap the pencil button to capture a thought.</p>
-    </div>`;
-    return;
+    const empty = document.createElement('div');
+    empty.id = 'empty-notes';
+    empty.innerHTML = `<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+    </svg><p>No notes yet.<br>Tap the pencil button to capture a thought.</p>`;
+    page.appendChild(empty);
+  } else {
+    notesArr.forEach((n, i) => {
+      const el = buildNoteCard(n);
+      el.style.transitionDelay = `${Math.min(i * 35, 200)}ms`;
+      page.appendChild(el);
+      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
+    });
   }
-  notesArr.forEach((n, i) => {
-    const el = buildNoteCard(n);
-    el.style.transitionDelay = `${Math.min(i * 35, 200)}ms`;
-    page.appendChild(el);
-    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
-  });
+
+  // Kick off connections check (async, non-blocking)
+  checkAndTriggerConnections().catch(() => {});
 }
 
 // ─────────────────────────────────────────────
@@ -1237,6 +1550,7 @@ async function saveCard(card, saveTag, note = '') {
   savedIds.add(card.id);
   savedCardsMap.set(card.id, record);
   await dbPut(record);
+  logSignal('save', card.topic, saveTag);
 }
 
 async function unsaveCard(id) {
@@ -1316,6 +1630,39 @@ document.getElementById('note-skip-btn').addEventListener('click', () =>
 );
 
 // ─────────────────────────────────────────────
+// Settings sheet
+// ─────────────────────────────────────────────
+const settingsOverlay = document.getElementById('settings-overlay');
+
+function openSettingsSheet() {
+  // Reflect current style
+  document.querySelectorAll('.style-opt').forEach(b =>
+    b.classList.toggle('selected', b.dataset.style === readingStyle)
+  );
+  settingsOverlay.classList.add('open');
+}
+
+function closeSettingsSheet() {
+  settingsOverlay.classList.remove('open');
+}
+
+document.getElementById('settings-btn').addEventListener('click', openSettingsSheet);
+document.getElementById('settings-close').addEventListener('click', closeSettingsSheet);
+settingsOverlay.addEventListener('click', e => {
+  if (e.target === settingsOverlay) closeSettingsSheet();
+});
+
+document.querySelectorAll('.style-opt').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    readingStyle = btn.dataset.style;
+    document.querySelectorAll('.style-opt').forEach(b =>
+      b.classList.toggle('selected', b.dataset.style === readingStyle)
+    );
+    await dbPutSetting('reading_style', readingStyle);
+  });
+});
+
+// ─────────────────────────────────────────────
 // Quick capture sheet
 // ─────────────────────────────────────────────
 const captureOverlay = document.getElementById('capture-overlay');
@@ -1370,10 +1717,23 @@ async function loadFeed() {
   refreshBtn.classList.add('spinning');
 
   try {
-    const res = await fetch('/api/feed');
+    // Build personalization params
+    const params = new URLSearchParams();
+    const pref = computePreferredTopics();
+    if (pref.length > 0) params.set('pref', pref.join(','));
+    params.set('style', readingStyle);
+    // Pass last 10 saved headlines for duplicate detection
+    const recentHeadlines = [...savedCardsMap.values()]
+      .slice(-10)
+      .map(c => c.headline)
+      .filter(Boolean);
+    if (recentHeadlines.length > 0) params.set('seen', recentHeadlines.join('|'));
+
+    const res = await fetch(`/api/feed?${params}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    feedCards = data.cards || [];
+    // Silently filter duplicate cards
+    feedCards = (data.cards || []).filter(c => !c.duplicate);
     renderFeedPage(feedCards, data.daily_brief || '');
   } catch (err) {
     page.innerHTML = '';
@@ -1394,6 +1754,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     activeTab = name;
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
     document.getElementById('feed-page').classList.toggle('hidden', name !== 'feed');
+    document.getElementById('end-of-feed').classList.toggle('hidden', name !== 'feed');
     document.getElementById('saved-page').classList.toggle('hidden', name !== 'saved');
     document.getElementById('read-later-page').classList.toggle('hidden', name !== 'read-later');
     document.getElementById('notes-page').classList.toggle('hidden', name !== 'notes');
@@ -1462,10 +1823,16 @@ document.getElementById('more-btn').addEventListener('click', async () => {
 // ─────────────────────────────────────────────
 (async () => {
   db = await openDB();
-  const [savedArr, notesFromDB] = await Promise.all([dbGetAll(), dbGetAllNotes()]);
+  const [savedArr, notesFromDB, signalsFromDB, storedStyle] = await Promise.all([
+    dbGetAll(),
+    dbGetAllNotes(),
+    dbGetAllSignals(),
+    dbGetSetting('reading_style'),
+  ]);
   savedArr.forEach(c => { savedIds.add(c.id); savedCardsMap.set(c.id, c); });
-  // Sort notes newest-first
   notesArr = notesFromDB.sort((a, b) => b.ts - a.ts);
+  signals = signalsFromDB;
+  if (storedStyle) readingStyle = storedStyle;
   updateBadges();
   await loadFeed();
 })();
