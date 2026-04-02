@@ -984,111 +984,107 @@
       font-style: italic;
     }
 
-    /* ── Fixture card ──────────────────────────── */
-    .fixture-card {
+    /* ── Fixture block (Sofascore-style grouped by competition) ── */
+    .fixture-block {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 14px 16px 16px;
       margin-bottom: 12px;
+      overflow: hidden;
       opacity: 0;
       transform: translateY(14px);
       transition: opacity .35s ease, transform .35s ease;
       cursor: default;
     }
-    .fixture-card.visible { opacity: 1; transform: translateY(0); }
-    .fixture-league-row {
+    .fixture-block.visible { opacity: 1; transform: translateY(0); }
+    .fixture-block-header {
       display: flex;
       align-items: center;
-      gap: 7px;
-      margin-bottom: 12px;
+      gap: 8px;
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.02);
     }
-    .fixture-league-logo {
+    .fixture-block-league-logo {
       width: 16px; height: 16px;
       object-fit: contain;
-      opacity: .75;
+      opacity: .8;
+      flex-shrink: 0;
     }
-    .fixture-league-name {
-      font-size: 10px;
+    .fixture-block-league-name {
+      font-size: 10.5px;
       font-weight: 700;
-      letter-spacing: .08em;
+      letter-spacing: .05em;
       text-transform: uppercase;
-      color: #555;
+      color: #666;
     }
-    .fixture-match {
+    .fixture-row {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 8px;
+      gap: 10px;
+      padding: 9px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.035);
     }
-    .fixture-team {
+    .fixture-row:last-child { border-bottom: none; }
+    .fixture-row-time {
+      font-size: 12px;
+      font-weight: 600;
+      color: #555;
+      min-width: 34px;
+      flex-shrink: 0;
+      line-height: 1;
+      text-align: right;
+    }
+    .fixture-row-time.is-live { color: #ef4444; }
+    .fixture-row-teams {
       flex: 1;
       display: flex;
       flex-direction: column;
+      gap: 5px;
+    }
+    .fixture-row-team {
+      display: flex;
       align-items: center;
       gap: 7px;
-      text-align: center;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      line-height: 1;
     }
-    .fixture-team-logo {
-      width: 36px; height: 36px;
+    .fixture-row-team img {
+      width: 17px; height: 17px;
       object-fit: contain;
+      flex-shrink: 0;
     }
-    .fixture-team-logo-placeholder {
-      width: 36px; height: 36px;
+    .fixture-row-team-ph {
+      width: 17px; height: 17px;
       border-radius: 50%;
       background: #222;
+      flex-shrink: 0;
     }
-    .fixture-team-name {
-      font-size: 11.5px;
-      font-weight: 600;
-      color: var(--text);
-      line-height: 1.25;
-      max-width: 90px;
-    }
-    .fixture-center {
+    .fixture-row-score {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 5px;
-      min-width: 64px;
+      min-width: 20px;
+      flex-shrink: 0;
     }
-    .fixture-score-value {
-      font-size: 24px;
-      font-weight: 800;
-      color: var(--text);
-      letter-spacing: 3px;
-      line-height: 1;
-    }
-    .fixture-vs {
+    .fixture-row-score span {
       font-size: 13px;
       font-weight: 700;
-      color: #333;
-      letter-spacing: .05em;
-    }
-    .fixture-time-label {
-      font-size: 11px;
-      color: var(--muted);
-      font-weight: 500;
-      text-align: center;
-      line-height: 1.3;
-    }
-    .fixture-live-indicator {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 11px;
-      font-weight: 700;
-      color: #ef4444;
-      letter-spacing: .04em;
+      color: var(--text);
+      line-height: 1;
     }
     .fixture-live-dot {
-      width: 6px; height: 6px;
+      display: inline-block;
+      width: 5px; height: 5px;
       border-radius: 50%;
       background: #ef4444;
       animation: fxpulse 1.4s ease-in-out infinite;
       flex-shrink: 0;
     }
-    @keyframes fxpulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+    @keyframes fxpulse { 0%,100%{opacity:1} 50%{opacity:.2} }
 
     /* scrollbar */
     ::-webkit-scrollbar { width: 0; }
@@ -1980,61 +1976,54 @@ captureSaveBtn.addEventListener('click', async () => {
 });
 
 // ─────────────────────────────────────────────
-// Fixture cards
+// Fixture blocks (grouped by competition)
 // ─────────────────────────────────────────────
-function buildFixtureCard(fixture) {
+function buildLeagueFixtureBlock(leagueName, leagueLogo, fixtures) {
   const el = document.createElement('article');
-  el.className = 'fixture-card tag-sports';
+  el.className = 'fixture-block tag-sports';
 
-  const leagueLogoHTML = fixture.leagueLogo
-    ? `<img class="fixture-league-logo" src="${fixture.leagueLogo}" alt="" loading="lazy">`
+  const headerLogo = leagueLogo
+    ? `<img class="fixture-block-league-logo" src="${leagueLogo}" alt="" loading="lazy">`
     : '';
 
-  const logoEl = (src) => src
-    ? `<img class="fixture-team-logo" src="${src}" alt="" loading="lazy">`
-    : `<div class="fixture-team-logo-placeholder"></div>`;
+  const logoImg = src => src
+    ? `<img src="${src}" alt="" loading="lazy">`
+    : `<div class="fixture-row-team-ph"></div>`;
 
-  let centerHTML;
-  if (fixture.status === 'live') {
-    const elapsed = fixture.elapsed != null ? `${fixture.elapsed}'` : 'LIVE';
-    centerHTML = `
-      <div class="fixture-score-value">${fixture.homeScore ?? 0}&thinsp;–&thinsp;${fixture.awayScore ?? 0}</div>
-      <div class="fixture-live-indicator"><span class="fixture-live-dot"></span>${elapsed}</div>`;
-  } else if (fixture.status === 'finished') {
-    centerHTML = `
-      <div class="fixture-score-value">${fixture.homeScore ?? 0}&thinsp;–&thinsp;${fixture.awayScore ?? 0}</div>
-      <div class="fixture-time-label">FT</div>`;
-  } else if (fixture.status === 'postponed') {
-    centerHTML = `
-      <div class="fixture-vs">PST</div>
-      <div class="fixture-time-label">Postponed</div>`;
-  } else {
-    centerHTML = `
-      <div class="fixture-vs">vs</div>
-      <div class="fixture-time-label">${fixture.kickoff}</div>`;
-  }
+  const rows = fixtures.map(f => {
+    const live     = f.status === 'live';
+    const finished = f.status === 'finished';
+    const pst      = f.status === 'postponed';
+
+    let timeCell;
+    if (live)     timeCell = `<div class="fixture-row-time is-live">${f.elapsed != null ? `${f.elapsed}'` : 'LIVE'}</div>`;
+    else if (finished) timeCell = `<div class="fixture-row-time">FT</div>`;
+    else if (pst) timeCell = `<div class="fixture-row-time" style="color:#555;font-size:10px">PST</div>`;
+    else          timeCell = `<div class="fixture-row-time">${f.kickoff}</div>`;
+
+    const scoreCell = (live || finished) ? `
+      <div class="fixture-row-score">
+        <span>${f.homeScore ?? 0}</span>
+        <span>${f.awayScore ?? 0}</span>
+      </div>` : (live ? `<div class="fixture-row-score"><span class="fixture-live-dot"></span></div>` : '');
+
+    return `
+      <div class="fixture-row">
+        ${timeCell}
+        <div class="fixture-row-teams">
+          <div class="fixture-row-team">${logoImg(f.homeLogo)}<span>${f.homeTeam}</span></div>
+          <div class="fixture-row-team">${logoImg(f.awayLogo)}<span>${f.awayTeam}</span></div>
+        </div>
+        ${scoreCell}
+      </div>`;
+  }).join('');
 
   el.innerHTML = `
-    <div class="fixture-league-row">
-      ${leagueLogoHTML}
-      <span class="fixture-league-name">${fixture.league}</span>
-    </div>
-    <div class="fixture-match">
-      <div class="fixture-team">
-        ${logoEl(fixture.homeLogo)}
-        <div class="fixture-team-name">${fixture.homeTeam}</div>
-      </div>
-      <div class="fixture-center">${centerHTML}</div>
-      <div class="fixture-team">
-        ${logoEl(fixture.awayLogo)}
-        <div class="fixture-team-name">${fixture.awayTeam}</div>
-      </div>
-    </div>
+    <div class="fixture-block-header">${headerLogo}<span class="fixture-block-league-name">${leagueName}</span></div>
+    ${rows}
   `;
 
-  // Self-contained — tapping does nothing
   el.addEventListener('click', e => e.stopPropagation());
-
   return el;
 }
 
@@ -2046,27 +2035,36 @@ async function loadFixtures() {
     const fixtures = data.fixtures || [];
     if (fixtures.length === 0) return;
 
+    // Group by league, preserving sort order
+    const leagueMap = new Map();
+    for (const f of fixtures) {
+      if (!leagueMap.has(f.league)) leagueMap.set(f.league, { logo: f.leagueLogo, fixtures: [] });
+      leagueMap.get(f.league).fixtures.push(f);
+    }
+    const blockEls = [...leagueMap.entries()].map(([name, { logo, fixtures: lf }]) =>
+      buildLeagueFixtureBlock(name, logo, lf)
+    );
+
     const page = document.getElementById('feed-page');
-    // Only inject into the feed tab's regular card list
     const cards = [...page.querySelectorAll('.card')];
     if (cards.length === 0) return;
 
-    // Spread fixtures evenly through the cards, starting after the 3rd card
-    // and then every ~4 cards, up to however many fixtures we have
-    const step = Math.max(3, Math.floor(cards.length / Math.min(fixtures.length, 6)));
-    let cardIdx = 2; // insert after 3rd card (0-indexed)
-    let injected = 0;
+    // Spread league blocks evenly through the feed
+    const step = Math.max(2, Math.floor(cards.length / Math.min(blockEls.length, 8)));
+    let cardIdx = 2;
 
-    for (const fixture of fixtures) {
-      if (cardIdx >= cards.length) break;
-      const refCard = cards[cardIdx];
-      const el = buildFixtureCard(fixture);
-      el.style.transitionDelay = `${injected * 60}ms`;
-      page.insertBefore(el, refCard.nextSibling);
+    blockEls.forEach((el, i) => {
+      if (cardIdx >= cards.length) {
+        // Remaining blocks go at the end before end-of-feed
+        const endEl = document.getElementById('end-of-feed');
+        page.insertBefore(el, endEl);
+      } else {
+        page.insertBefore(el, cards[cardIdx].nextSibling);
+        cardIdx += step;
+      }
+      el.style.transitionDelay = `${i * 60}ms`;
       requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
-      cardIdx += step;
-      injected++;
-    }
+    });
   } catch (err) {
     console.warn('Fixtures load failed:', err.message);
   }

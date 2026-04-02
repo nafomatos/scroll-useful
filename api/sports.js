@@ -29,9 +29,9 @@ function parseStatus(fixture) {
 function formatKickoff(dateStr) {
   if (!dateStr) return '';
   try {
-    return new Date(dateStr).toLocaleTimeString('en-GB', {
-      hour: '2-digit', minute: '2-digit', timeZone: 'UTC',
-    }) + ' UTC';
+    return new Date(dateStr).toLocaleTimeString('de-DE', {
+      hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin',
+    });
   } catch { return ''; }
 }
 
