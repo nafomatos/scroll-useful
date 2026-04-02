@@ -608,6 +608,153 @@
     .intent-opt:active { background: #1f1f23; border-color: #333; }
     .intent-opt .emoji { font-size: 18px; line-height: 1; }
 
+    /* ── Floating capture button ───────────────── */
+    #capture-fab {
+      position: fixed;
+      bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+      right: 20px;
+      z-index: 150;
+      width: 50px; height: 50px;
+      border-radius: 50%;
+      background: var(--text);
+      color: var(--bg);
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,.6);
+      transition: transform .15s, box-shadow .15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #capture-fab:active { transform: scale(.92); box-shadow: 0 2px 10px rgba(0,0,0,.5); }
+    #capture-fab svg { width: 20px; height: 20px; }
+
+    /* ── Capture bottom sheet ──────────────────── */
+    #capture-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 200;
+      display: flex;
+      align-items: flex-end;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease;
+    }
+    #capture-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+    #capture-sheet {
+      width: 100%;
+      background: #18181b;
+      border-radius: 20px 20px 0 0;
+      border-top: 1px solid #2a2a2e;
+      padding: 12px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+      transform: translateY(100%);
+      transition: transform .28s cubic-bezier(.32,1,.23,1);
+    }
+    #capture-overlay.open #capture-sheet { transform: translateY(0); }
+    #capture-sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #222;
+    }
+    #capture-sheet-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    #capture-close {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: none;
+      background: #2a2a2e;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #capture-input {
+      width: 100%;
+      background: #111114;
+      border: 1px solid #2a2a2e;
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.55;
+      padding: 11px 13px;
+      resize: none;
+      font-family: inherit;
+      outline: none;
+      min-height: 90px;
+      margin-bottom: 10px;
+    }
+    #capture-input:focus { border-color: #3a3a3e; }
+    #capture-input::placeholder { color: #444; }
+    #capture-save-btn {
+      width: 100%;
+      padding: 13px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      background: var(--text);
+      color: var(--bg);
+      -webkit-tap-highlight-color: transparent;
+    }
+    #capture-save-btn:active { background: #ccc; }
+    #capture-save-btn:disabled { opacity: .35; cursor: default; }
+
+    /* ── Note card (in Notes tab) ──────────────── */
+    .note-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity .3s ease, transform .3s ease, border-color .2s, background .2s;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .note-card.visible { opacity: 1; transform: translateY(0); }
+    .note-card.deleting {
+      opacity: 0;
+      transform: scale(.95);
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .note-card-text {
+      font-size: 14.5px;
+      line-height: 1.6;
+      color: var(--text);
+      margin-bottom: 8px;
+      white-space: pre-wrap;
+    }
+    .note-card-time {
+      font-size: 11.5px;
+      color: #555;
+      font-weight: 500;
+    }
+    #empty-notes {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 32px;
+      gap: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+    #empty-notes svg { opacity: .25; }
+    #empty-notes p { font-size: 14px; line-height: 1.5; }
+
     /* scrollbar */
     ::-webkit-scrollbar { width: 0; }
   </style>
@@ -626,7 +773,8 @@
   <div id="tabs">
     <button class="tab active" data-tab="feed">Feed <span class="badge" id="feed-count">—</span></button>
     <button class="tab" data-tab="saved">Saved <span class="badge" id="saved-count">0</span></button>
-    <button class="tab" data-tab="read-later">Read Later <span class="badge" id="read-later-count">0</span></button>
+    <button class="tab" data-tab="read-later">Later <span class="badge" id="read-later-count">0</span></button>
+    <button class="tab" data-tab="notes">Notes <span class="badge" id="notes-count">0</span></button>
   </div>
 </div>
 
@@ -682,17 +830,46 @@
   <!-- read-later cards rendered here -->
 </div>
 
+<div id="notes-page" class="feed-page hidden">
+  <!-- notes rendered here -->
+</div>
+
+<!-- floating quick-capture button -->
+<button id="capture-fab" aria-label="Quick note">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+  </svg>
+</button>
+
+<!-- quick capture bottom sheet -->
+<div id="capture-overlay">
+  <div id="capture-sheet">
+    <div id="capture-sheet-header">
+      <span id="capture-sheet-title">Quick note</span>
+      <button id="capture-close" aria-label="Dismiss">×</button>
+    </div>
+    <textarea id="capture-input" placeholder="What's on your mind?" rows="3"></textarea>
+    <button id="capture-save-btn" disabled>Save</button>
+  </div>
+</div>
+
 <script>
 // ─────────────────────────────────────────────
 // IndexedDB
 // ─────────────────────────────────────────────
-const DB_NAME = 'pulse-db', DB_VER = 1, STORE = 'saved';
+const DB_NAME = 'pulse-db', DB_VER = 2, STORE = 'saved', NOTES_STORE = 'notes';
 let db = null;
 
 function openDB() {
   return new Promise((res, rej) => {
     const r = indexedDB.open(DB_NAME, DB_VER);
-    r.onupgradeneeded = e => e.target.result.createObjectStore(STORE, { keyPath: 'id' });
+    r.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains(STORE))
+        d.createObjectStore(STORE, { keyPath: 'id' });
+      if (!d.objectStoreNames.contains(NOTES_STORE))
+        d.createObjectStore(NOTES_STORE, { keyPath: 'id' });
+    };
     r.onsuccess = e => res(e.target.result);
     r.onerror = e => rej(e.target.error);
   });
@@ -725,6 +902,33 @@ function dbDelete(id) {
   });
 }
 
+function dbGetAllNotes() {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(NOTES_STORE, 'readonly');
+    const r = tx.objectStore(NOTES_STORE).getAll();
+    r.onsuccess = e => res(e.target.result);
+    r.onerror = e => rej(e.target.error);
+  });
+}
+
+function dbPutNote(note) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(NOTES_STORE, 'readwrite');
+    tx.objectStore(NOTES_STORE).put(note);
+    tx.oncomplete = () => res();
+    tx.onerror = e => rej(e.target.error);
+  });
+}
+
+function dbDeleteNote(id) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(NOTES_STORE, 'readwrite');
+    tx.objectStore(NOTES_STORE).delete(id);
+    tx.oncomplete = () => res();
+    tx.onerror = e => rej(e.target.error);
+  });
+}
+
 // ─────────────────────────────────────────────
 // State
 // ─────────────────────────────────────────────
@@ -732,6 +936,7 @@ let feedCards = [];
 let savedIds = new Set();
 let savedCardsMap = new Map(); // id → full card object (includes saveTag)
 let activeTab = 'feed';
+let notesArr = []; // [{id, text, ts}] sorted newest-first
 
 // ─────────────────────────────────────────────
 // Utils
@@ -961,6 +1166,69 @@ function emptyHTML(msg) {
   </div>`;
 }
 
+function formatNoteTime(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = now - d;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'Just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const days = Math.floor(h / 24);
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function buildNoteCard(note) {
+  const el = document.createElement('div');
+  el.className = 'note-card';
+  el.dataset.id = note.id;
+  el.innerHTML = `
+    <div class="note-card-text">${note.text.replace(/</g, '&lt;')}</div>
+    <div class="note-card-time">${formatNoteTime(note.ts)}</div>
+  `;
+
+  // Long-press to delete
+  let pressTimer = null;
+  const startPress = () => {
+    pressTimer = setTimeout(async () => {
+      el.classList.add('deleting');
+      await dbDeleteNote(note.id);
+      notesArr = notesArr.filter(n => n.id !== note.id);
+      updateBadges();
+      setTimeout(() => el.remove(), 220);
+    }, 600);
+  };
+  const cancelPress = () => clearTimeout(pressTimer);
+  el.addEventListener('pointerdown', startPress);
+  el.addEventListener('pointerup', cancelPress);
+  el.addEventListener('pointerleave', cancelPress);
+  el.addEventListener('contextmenu', e => e.preventDefault());
+
+  return el;
+}
+
+function renderNotesPage() {
+  const page = document.getElementById('notes-page');
+  page.innerHTML = '';
+  if (notesArr.length === 0) {
+    page.innerHTML = `<div id="empty-notes">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+      </svg>
+      <p>No notes yet.<br>Tap the pencil button to capture a thought.</p>
+    </div>`;
+    return;
+  }
+  notesArr.forEach((n, i) => {
+    const el = buildNoteCard(n);
+    el.style.transitionDelay = `${Math.min(i * 35, 200)}ms`;
+    page.appendChild(el);
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
+  });
+}
+
 // ─────────────────────────────────────────────
 // Save / unsave
 // ─────────────────────────────────────────────
@@ -982,6 +1250,7 @@ function updateBadges() {
   const sv = savedCardsMap.size - rl;
   document.getElementById('saved-count').textContent = sv || '0';
   document.getElementById('read-later-count').textContent = rl || '0';
+  document.getElementById('notes-count').textContent = notesArr.length || '0';
 }
 
 // ─────────────────────────────────────────────
@@ -1047,6 +1316,47 @@ document.getElementById('note-skip-btn').addEventListener('click', () =>
 );
 
 // ─────────────────────────────────────────────
+// Quick capture sheet
+// ─────────────────────────────────────────────
+const captureOverlay = document.getElementById('capture-overlay');
+const captureInput = document.getElementById('capture-input');
+const captureSaveBtn = document.getElementById('capture-save-btn');
+
+function openCaptureSheet() {
+  captureInput.value = '';
+  captureSaveBtn.disabled = true;
+  captureOverlay.classList.add('open');
+  // defer focus so iOS keyboard doesn't fight the sheet animation
+  setTimeout(() => captureInput.focus(), 100);
+}
+
+function closeCaptureSheet() {
+  captureOverlay.classList.remove('open');
+  captureInput.blur();
+}
+
+captureInput.addEventListener('input', () => {
+  captureSaveBtn.disabled = captureInput.value.trim().length === 0;
+});
+
+captureOverlay.addEventListener('click', e => {
+  if (e.target === captureOverlay) closeCaptureSheet();
+});
+document.getElementById('capture-close').addEventListener('click', closeCaptureSheet);
+document.getElementById('capture-fab').addEventListener('click', openCaptureSheet);
+
+captureSaveBtn.addEventListener('click', async () => {
+  const text = captureInput.value.trim();
+  if (!text) return;
+  const note = { id: `note-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, text, ts: Date.now() };
+  notesArr.unshift(note);
+  updateBadges();
+  await dbPutNote(note);
+  closeCaptureSheet();
+  if (activeTab === 'notes') renderNotesPage();
+});
+
+// ─────────────────────────────────────────────
 // Fetch feed
 // ─────────────────────────────────────────────
 async function loadFeed() {
@@ -1086,8 +1396,10 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.getElementById('feed-page').classList.toggle('hidden', name !== 'feed');
     document.getElementById('saved-page').classList.toggle('hidden', name !== 'saved');
     document.getElementById('read-later-page').classList.toggle('hidden', name !== 'read-later');
+    document.getElementById('notes-page').classList.toggle('hidden', name !== 'notes');
     if (name === 'saved') renderSavedPage();
     else if (name === 'read-later') renderReadLaterPage();
+    else if (name === 'notes') renderNotesPage();
   });
 });
 
@@ -1150,8 +1462,10 @@ document.getElementById('more-btn').addEventListener('click', async () => {
 // ─────────────────────────────────────────────
 (async () => {
   db = await openDB();
-  const savedArr = await dbGetAll();
+  const [savedArr, notesFromDB] = await Promise.all([dbGetAll(), dbGetAllNotes()]);
   savedArr.forEach(c => { savedIds.add(c.id); savedCardsMap.set(c.id, c); });
+  // Sort notes newest-first
+  notesArr = notesFromDB.sort((a, b) => b.ts - a.ts);
   updateBadges();
   await loadFeed();
 })();
