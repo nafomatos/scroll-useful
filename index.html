@@ -1086,6 +1086,172 @@
     }
     @keyframes fxpulse { 0%,100%{opacity:1} 50%{opacity:.2} }
 
+    /* ── Pull to refresh ─────────────────────────── */
+    #pull-indicator {
+      position: fixed;
+      top: calc(var(--safe-top) + 62px);
+      left: 50%; transform: translateX(-50%) translateY(-80px);
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--surface); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .25s ease, opacity .25s;
+      opacity: 0; z-index: 90; pointer-events: none;
+    }
+    #pull-indicator.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #pull-indicator svg { animation: spin .7s linear infinite; }
+
+    /* ── Search button ───────────────────────────── */
+    #search-btn {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--muted); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: color .2s; flex-shrink: 0;
+    }
+
+    /* ── Search overlay ──────────────────────────── */
+    #search-overlay {
+      position: fixed; inset: 0; z-index: 300;
+      background: rgba(8,8,8,.97);
+      display: flex; flex-direction: column;
+      padding: calc(var(--safe-top) + 16px) 16px 16px;
+      transform: translateY(100%); transition: transform .3s ease;
+    }
+    #search-overlay.open { transform: translateY(0); }
+    #search-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    #search-input {
+      flex: 1; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 10px 14px;
+      color: var(--text); font-size: 15px; font-family: inherit; outline: none;
+    }
+    #search-input:focus { border-color: #3a3a3e; }
+    #search-cancel {
+      background: none; border: none; color: var(--muted);
+      font-size: 14px; font-weight: 600; cursor: pointer; padding: 6px; white-space: nowrap;
+    }
+    #search-results { flex: 1; overflow-y: auto; }
+    .search-result { padding: 12px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+    .search-result:last-child { border-bottom: none; }
+    .search-result-type {
+      font-size: 10px; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; color: #555; margin-bottom: 4px;
+    }
+    .search-result-title { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.4; }
+    .search-result-snippet {
+      font-size: 12px; color: var(--muted); margin-top: 3px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    #search-empty { text-align: center; padding: 60px 20px; color: #444; font-size: 14px; }
+
+    /* ── Trending strip ──────────────────────────── */
+    #trending-strip {
+      display: flex; gap: 8px; overflow-x: auto; padding: 0 0 14px;
+      scrollbar-width: none; -webkit-overflow-scrolling: touch; margin-bottom: 4px;
+    }
+    #trending-strip::-webkit-scrollbar { display: none; }
+    .trend-chip {
+      flex-shrink: 0; padding: 5px 12px; border-radius: 99px;
+      background: var(--surface); border: 1px solid var(--border);
+      font-size: 12px; font-weight: 600; color: var(--muted);
+      cursor: pointer; white-space: nowrap; transition: background .15s, color .15s;
+    }
+    .trend-chip:active { background: #1f1f23; color: var(--text); }
+
+    /* ── Ask the feed ────────────────────────────── */
+    #ask-bar { display: flex; gap: 8px; margin-bottom: 14px; }
+    #ask-input {
+      flex: 1; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 10px 14px;
+      color: var(--text); font-size: 14px; font-family: inherit; outline: none;
+    }
+    #ask-input:focus { border-color: #3a3a3e; }
+    #ask-input::placeholder { color: #444; }
+    #ask-btn {
+      padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--muted); font-size: 13px;
+      font-weight: 600; cursor: pointer; white-space: nowrap; transition: color .2s, background .2s;
+    }
+    #ask-btn:disabled { opacity: .4; cursor: default; }
+    #ask-answer {
+      margin-bottom: 14px; padding: 12px 14px;
+      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
+      border-radius: 12px; font-size: 13.5px; line-height: 1.65; color: #bbb; display: none;
+    }
+    #ask-answer.visible { display: block; }
+
+    /* ── Topic chips (settings) ──────────────────── */
+    #topic-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+    .topic-chip {
+      padding: 6px 12px; border-radius: 99px; font-size: 12px; font-weight: 600;
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--muted); cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .topic-chip.active {
+      background: rgba(255,255,255,.1); color: var(--text); border-color: rgba(255,255,255,.25);
+    }
+
+    /* ── Language toggle ─────────────────────────── */
+    #lang-toggle-row {
+      display: flex; align-items: center;
+      justify-content: space-between; padding: 12px 0 4px;
+    }
+    #lang-toggle-text { line-height: 1.4; }
+    #lang-toggle-label { font-size: 13.5px; color: var(--text); }
+    #lang-toggle-sub { font-size: 11.5px; color: #555; }
+    .toggle-switch { position: relative; width: 44px; height: 26px; flex-shrink: 0; cursor: pointer; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track {
+      position: absolute; inset: 0; border-radius: 13px;
+      background: #2a2a2e; transition: background .2s;
+    }
+    .toggle-thumb {
+      position: absolute; top: 3px; left: 3px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #666; transition: transform .2s, background .2s; pointer-events: none;
+    }
+    .toggle-switch input:checked ~ .toggle-track { background: rgba(255,255,255,.15); }
+    .toggle-switch input:checked ~ .toggle-thumb { transform: translateX(18px); background: var(--text); }
+
+    /* ── Card swipe feedback ─────────────────────── */
+    .card { touch-action: pan-y; }
+    .card.swipe-right { background: rgba(163,230,53,.07); border-color: rgba(163,230,53,.25); }
+    .card.swipe-left  { background: rgba(239,68,68,.06);  border-color: rgba(239,68,68,.2); }
+
+    /* ── Cluster stack ───────────────────────────── */
+    .cluster-stack { position: relative; margin-bottom: 12px; }
+    .cluster-stack > .card { margin-bottom: 0; }
+    .cluster-behind {
+      position: absolute; top: 6px; left: 4px; right: 4px; bottom: -6px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); z-index: -1;
+    }
+    .cluster-behind-2 {
+      position: absolute; top: 10px; left: 8px; right: 8px; bottom: -10px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); z-index: -2;
+    }
+    .cluster-expand-btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 7px 14px; margin-top: 4px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--muted); font-size: 12px; font-weight: 600;
+      cursor: pointer; width: 100%; transition: background .15s, color .15s;
+    }
+    .cluster-expand-btn:active { background: #1f1f23; }
+    .cluster-hidden-cards { display: none; }
+    .cluster-hidden-cards.open { display: block; }
+
+    /* ── Sports page ─────────────────────────────── */
+    #sports-page .sports-rss-divider {
+      display: flex; align-items: center; gap: 10px;
+      margin: 16px 0 12px; color: #333; font-size: 11px;
+      font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    }
+    #sports-page .sports-rss-divider::before, #sports-page .sports-rss-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
     /* scrollbar */
     ::-webkit-scrollbar { width: 0; }
   </style>
@@ -1096,6 +1262,11 @@
   <div id="header-top">
     <div id="logo">Pulse</div>
     <div id="header-actions">
+      <button id="search-btn" aria-label="Search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+      </button>
       <button id="settings-btn" aria-label="Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -1110,6 +1281,7 @@
   </div>
   <div id="tabs">
     <button class="tab active" data-tab="feed">Feed <span class="badge" id="feed-count">—</span></button>
+    <button class="tab" data-tab="sports">Sports</button>
     <button class="tab" data-tab="saved">Saved <span class="badge" id="saved-count">0</span></button>
     <button class="tab" data-tab="read-later">Later <span class="badge" id="read-later-count">0</span></button>
     <button class="tab" data-tab="notes">Notes <span class="badge" id="notes-count">0</span></button>
@@ -1168,6 +1340,19 @@
     <textarea id="interest-brief-input"
       placeholder="e.g. AI startups in Europe, Brazilian fintech, F1, climate tech…"
     ></textarea>
+    <p class="settings-section-label" style="margin-top:20px">Topics</p>
+    <div id="topic-chips"></div>
+    <div id="lang-toggle-row">
+      <div id="lang-toggle-text">
+        <div id="lang-toggle-label">Include Portuguese sources</div>
+        <div id="lang-toggle-sub">Adds PT-language RSS feeds</div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="lang-toggle-input">
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
   </div>
 </div>
 
@@ -1200,8 +1385,24 @@
   <!-- read-later cards rendered here -->
 </div>
 
+<div id="sports-page" class="feed-page hidden">
+  <!-- sports fixtures + RSS cards rendered here -->
+</div>
+
 <div id="notes-page" class="feed-page hidden">
   <!-- notes rendered here -->
+</div>
+
+<div id="pull-indicator">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg>
+</div>
+
+<div id="search-overlay">
+  <div id="search-header">
+    <input id="search-input" type="search" placeholder="Search articles, notes…" autocomplete="off" autocorrect="off">
+    <button id="search-cancel">Cancel</button>
+  </div>
+  <div id="search-results"></div>
 </div>
 
 <!-- floating quick-capture button -->
@@ -1344,6 +1545,7 @@ function dbPutSetting(key, value) {
 // State
 // ─────────────────────────────────────────────
 let feedCards = [];
+let sportsRssCards = []; // sports-topic RSS cards, shown in Sports tab
 let savedIds = new Set();
 let savedCardsMap = new Map(); // id → full card object (includes saveTag)
 let activeTab = 'feed';
@@ -1354,6 +1556,9 @@ let interestBrief = ''; // persisted in settings as interest_brief
 let mindsetSummary = ''; // cached "Your mind right now" summary
 let mindsetNoteCount = -1; // note count at last mindset generation (-1 = never)
 let currentConnections = null; // cached connections result
+const ALL_TOPICS = ['tech', 'startups', 'science', 'design', 'finance', 'culture', 'sports'];
+let customTopics = [...ALL_TOPICS]; // active topics — persisted as custom_topics
+let showPt = false; // include PT-language feeds — persisted as show_pt
 
 // ─────────────────────────────────────────────
 // Utils
@@ -1509,7 +1714,39 @@ const io = new IntersectionObserver(entries => {
   });
 }, { threshold: 0.05 });
 
+function buildTrendingStrip(cards) {
+  const stop = new Set(['the','a','an','and','of','in','to','for','on','is','are','was','were','it','this','that','with','at','by','from','as','be','has','have','had','will','or','but','not','its','their','than','also','been','about','they','he','she','we','his','her','our','new','more','over','after','into','when','who','what','how']);
+  const freq = {};
+  cards.forEach(c => {
+    const text = ((c.headline || '') + ' ' + (c.summary || '')).toLowerCase();
+    text.match(/\b[a-z][a-z'-]{2,}\b/g)?.forEach(w => {
+      if (!stop.has(w)) freq[w] = (freq[w] || 0) + 1;
+    });
+  });
+  const top = Object.entries(freq).filter(([,n]) => n > 1).sort((a,b) => b[1]-a[1]).slice(0, 12).map(([w]) => w);
+  if (top.length === 0) return null;
+  const strip = document.createElement('div');
+  strip.id = 'trending-strip';
+  top.forEach(word => {
+    const chip = document.createElement('button');
+    chip.className = 'trend-chip';
+    chip.textContent = word;
+    chip.addEventListener('click', () => {
+      const q = word;
+      document.getElementById('search-input').value = q;
+      document.getElementById('search-overlay').classList.add('open');
+      runSearch(q);
+    });
+    strip.appendChild(chip);
+  });
+  return strip;
+}
+
 function renderFeedPage(cards, dailyBrief) {
+  // Separate sports RSS cards into their own bucket
+  sportsRssCards = cards.filter(c => c.topic === 'sports');
+  const feedOnly = clusterFeedCards(cards.filter(c => c.topic !== 'sports'));
+
   const page = document.getElementById('feed-page');
   // Preserve #carta element across innerHTML wipes
   const cartaEl = document.getElementById('carta') || (() => {
@@ -1550,14 +1787,65 @@ function renderFeedPage(cards, dailyBrief) {
     cartaEl.classList.add('hidden');
   }
 
-  cards.forEach((c, i) => {
-    const el = buildCard(c);
-    // stagger delay capped at 300ms
-    el.style.transitionDelay = `${Math.min(i * 40, 300)}ms`;
-    page.appendChild(el);
-    io.observe(el);
+  // Trending strip — flatten clusters back to cards for keyword analysis
+  const trendEl = buildTrendingStrip(feedOnly.flatMap(x => x._isCluster ? x.cards : [x]));
+  if (trendEl) page.appendChild(trendEl);
+
+  // Ask the feed bar
+  const askBar = document.createElement('div');
+  askBar.id = 'ask-bar';
+  askBar.innerHTML = `<input id="ask-input" type="text" placeholder="Ask about today's news…"><button id="ask-btn">Ask</button>`;
+  page.appendChild(askBar);
+  const askAnswer = document.createElement('div');
+  askAnswer.id = 'ask-answer';
+  page.appendChild(askAnswer);
+  document.getElementById('ask-btn').addEventListener('click', handleAskFeed);
+  document.getElementById('ask-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleAskFeed(); });
+
+  let cardCount = 0;
+  feedOnly.forEach((item, i) => {
+    if (item._isCluster) {
+      // Render cluster stack
+      const wrap = document.createElement('div');
+      wrap.className = 'cluster-stack';
+      if (item.cards.length >= 3) wrap.appendChild(Object.assign(document.createElement('div'), { className: 'cluster-behind-2' }));
+      if (item.cards.length >= 2) wrap.appendChild(Object.assign(document.createElement('div'), { className: 'cluster-behind' }));
+      const topEl = buildCard(item.cards[0]);
+      topEl.style.transitionDelay = `${Math.min(i * 40, 300)}ms`;
+      wrap.appendChild(topEl);
+      io.observe(topEl);
+      if (item.cards.length > 1) {
+        const hidden = document.createElement('div');
+        hidden.className = 'cluster-hidden-cards';
+        item.cards.slice(1).forEach((c2, j) => {
+          const el2 = buildCard(c2);
+          el2.style.transitionDelay = `${j * 40}ms`;
+          hidden.appendChild(el2);
+        });
+        const expandBtn = document.createElement('button');
+        expandBtn.className = 'cluster-expand-btn';
+        expandBtn.textContent = `+${item.cards.length - 1} related`;
+        expandBtn.addEventListener('click', () => {
+          hidden.classList.toggle('open');
+          expandBtn.textContent = hidden.classList.contains('open') ? 'Show less' : `+${item.cards.length - 1} related`;
+          if (hidden.classList.contains('open')) {
+            hidden.querySelectorAll('.card').forEach(el2 => io.observe(el2));
+          }
+        });
+        wrap.appendChild(hidden);
+        wrap.appendChild(expandBtn);
+      }
+      page.appendChild(wrap);
+      cardCount += item.cards.length;
+    } else {
+      const el = buildCard(item);
+      el.style.transitionDelay = `${Math.min(i * 40, 300)}ms`;
+      page.appendChild(el);
+      io.observe(el);
+      cardCount++;
+    }
   });
-  document.getElementById('feed-count').textContent = cards.length || '—';
+  document.getElementById('feed-count').textContent = cardCount || '—';
   document.getElementById('end-of-feed').classList.remove('hidden');
 }
 
@@ -1602,6 +1890,28 @@ function emptyHTML(msg) {
     </svg>
     <p>${msg}</p>
   </div>`;
+}
+
+async function renderSportsPage() {
+  const page = document.getElementById('sports-page');
+  page.innerHTML = '';
+  // Inject live fixtures first
+  await loadFixtures(page);
+  // Then sports RSS cards
+  if (sportsRssCards.length > 0) {
+    const divider = document.createElement('div');
+    divider.className = 'sports-rss-divider';
+    divider.textContent = 'News';
+    page.appendChild(divider);
+    sportsRssCards.forEach((c, i) => {
+      const el = buildCard(c);
+      el.style.transitionDelay = `${Math.min(i * 40, 200)}ms`;
+      page.appendChild(el);
+      io.observe(el);
+    });
+  } else if (!page.querySelector('.fixture-block')) {
+    page.innerHTML = emptyHTML('No sports content today.<br>Check back later.');
+  }
 }
 
 function formatNoteTime(ts) {
@@ -1903,6 +2213,9 @@ function openSettingsSheet() {
     b.classList.toggle('selected', b.dataset.style === readingStyle)
   );
   document.getElementById('interest-brief-input').value = interestBrief;
+  const li = document.getElementById('lang-toggle-input');
+  if (li) li.checked = showPt;
+  renderTopicChips();
   settingsOverlay.classList.add('open');
 }
 
@@ -2027,7 +2340,8 @@ function buildLeagueFixtureBlock(leagueName, leagueLogo, fixtures) {
   return el;
 }
 
-async function loadFixtures() {
+async function loadFixtures(targetPage) {
+  const page = targetPage || document.getElementById('sports-page');
   try {
     const res = await fetch('/api/sports');
     if (!res.ok) return;
@@ -2045,23 +2359,9 @@ async function loadFixtures() {
       buildLeagueFixtureBlock(name, logo, lf)
     );
 
-    const page = document.getElementById('feed-page');
-    const cards = [...page.querySelectorAll('.card')];
-    if (cards.length === 0) return;
-
-    // Spread league blocks evenly through the feed
-    const step = Math.max(2, Math.floor(cards.length / Math.min(blockEls.length, 8)));
-    let cardIdx = 2;
-
+    // In sports page: stack all blocks on top
     blockEls.forEach((el, i) => {
-      if (cardIdx >= cards.length) {
-        // Remaining blocks go at the end before end-of-feed
-        const endEl = document.getElementById('end-of-feed');
-        page.insertBefore(el, endEl);
-      } else {
-        page.insertBefore(el, cards[cardIdx].nextSibling);
-        cardIdx += step;
-      }
+      page.appendChild(el);
       el.style.transitionDelay = `${i * 60}ms`;
       requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
     });
@@ -2098,14 +2398,17 @@ async function loadFeed() {
       .filter(Boolean);
     if (recentHeadlines.length > 0) params.set('seen', recentHeadlines.join('|'));
 
+    // Custom topics + language
+    if (customTopics.length > 0 && customTopics.length < ALL_TOPICS.length)
+      params.set('topics', customTopics.join(','));
+    if (!showPt) params.set('pt', '0');
+
     const res = await fetch(`/api/feed?${params}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     // Silently filter duplicate cards
     feedCards = (data.cards || []).filter(c => !c.duplicate);
     renderFeedPage(feedCards, data.daily_brief || '');
-    // Inject fixture cards async — doesn't block feed display
-    loadFixtures().catch(() => {});
   } catch (err) {
     page.innerHTML = '';
     document.getElementById('error-msg').textContent = `Failed to load feed: ${err.message}`;
@@ -2126,10 +2429,12 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
     document.getElementById('feed-page').classList.toggle('hidden', name !== 'feed');
     document.getElementById('end-of-feed').classList.toggle('hidden', name !== 'feed');
+    document.getElementById('sports-page').classList.toggle('hidden', name !== 'sports');
     document.getElementById('saved-page').classList.toggle('hidden', name !== 'saved');
     document.getElementById('read-later-page').classList.toggle('hidden', name !== 'read-later');
     document.getElementById('notes-page').classList.toggle('hidden', name !== 'notes');
-    if (name === 'saved') renderSavedPage();
+    if (name === 'sports') renderSportsPage().catch(() => {});
+    else if (name === 'saved') renderSavedPage();
     else if (name === 'read-later') renderReadLaterPage();
     else if (name === 'notes') renderNotesPage();
   });
@@ -2190,11 +2495,282 @@ document.getElementById('more-btn').addEventListener('click', async () => {
 });
 
 // ─────────────────────────────────────────────
+// Topic clustering
+// ─────────────────────────────────────────────
+function clusterFeedCards(cards) {
+  // Simple keyword-overlap clustering
+  function keywords(card) {
+    const text = ((card.headline || '') + ' ' + (card.summary || '')).toLowerCase();
+    const stop = new Set(['the','a','an','and','of','in','to','for','on','is','are','was','were','it','this','that','with','at','by','from','as','be','has','have','had','will','or','but','not','its','their','than','also','been','about']);
+    return new Set(text.match(/\b[a-z][a-z'-]{3,}\b/g)?.filter(w => !stop.has(w)) || []);
+  }
+  function overlap(a, b) {
+    let n = 0; a.forEach(w => { if (b.has(w)) n++; });
+    return n / Math.max(a.size, b.size, 1);
+  }
+  const THRESHOLD = 0.28;
+  const kws = cards.map(keywords);
+  const used = new Array(cards.length).fill(false);
+  const result = [];
+  for (let i = 0; i < cards.length; i++) {
+    if (used[i]) continue;
+    const cluster = [cards[i]];
+    used[i] = true;
+    for (let j = i + 1; j < cards.length && cluster.length < 4; j++) {
+      if (!used[j] && overlap(kws[i], kws[j]) >= THRESHOLD) {
+        cluster.push(cards[j]);
+        used[j] = true;
+      }
+    }
+    if (cluster.length > 1) result.push({ _isCluster: true, cards: cluster });
+    else result.push(cards[i]);
+  }
+  return result;
+}
+
+// ─────────────────────────────────────────────
+// Ask the feed
+// ─────────────────────────────────────────────
+async function handleAskFeed() {
+  const input = document.getElementById('ask-input');
+  const btn = document.getElementById('ask-btn');
+  const answer = document.getElementById('ask-answer');
+  const q = (input?.value || '').trim();
+  if (!q || !btn || !answer) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+  answer.classList.remove('visible');
+  try {
+    const context = feedCards.slice(0, 20).map(c => `${c.headline}: ${c.summary || ''}`).join('\n');
+    const res = await fetch('/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: q, context }),
+    });
+    const data = await res.json();
+    answer.textContent = data.answer || 'No answer.';
+    answer.classList.add('visible');
+  } catch (err) {
+    answer.textContent = 'Could not get an answer right now.';
+    answer.classList.add('visible');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Ask';
+  }
+}
+
+// ─────────────────────────────────────────────
+// Pull to refresh
+// ─────────────────────────────────────────────
+(function setupPullToRefresh() {
+  let startY = 0, pulling = false;
+  const indicator = document.getElementById('pull-indicator');
+  document.addEventListener('touchstart', e => {
+    if (window.scrollY === 0) { startY = e.touches[0].clientY; pulling = true; }
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!pulling) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy > 20) indicator.classList.add('visible');
+  }, { passive: true });
+  document.addEventListener('touchend', async e => {
+    if (!pulling) return;
+    pulling = false;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (dy > 70) {
+      if (activeTab === 'feed') await loadFeed();
+      else if (activeTab === 'sports') await renderSportsPage();
+    }
+    indicator.classList.remove('visible');
+  }, { passive: true });
+})();
+
+// ─────────────────────────────────────────────
+// Swipe gestures on cards
+// ─────────────────────────────────────────────
+(function setupSwipeGestures() {
+  let sx = 0, sy = 0, swipingEl = null, swipingCard = null;
+  document.addEventListener('touchstart', e => {
+    const card = e.target.closest('.card');
+    if (!card) return;
+    // Don't intercept save-btn taps
+    if (e.target.closest('.save-btn, a, button')) return;
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+    swipingEl = card;
+    swipingCard = feedCards.find(c => c.id === card.dataset.id) ||
+                  sportsRssCards.find(c => c.id === card.dataset.id);
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!swipingEl) return;
+    const dx = e.touches[0].clientX - sx;
+    const dy = e.touches[0].clientY - sy;
+    if (Math.abs(dy) > Math.abs(dx) + 10) { swipingEl = null; return; }
+    if (Math.abs(dx) > 30) {
+      swipingEl.classList.toggle('swipe-right', dx > 0);
+      swipingEl.classList.toggle('swipe-left', dx < 0);
+    }
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (!swipingEl) return;
+    const dx = e.changedTouches[0].clientX - sx;
+    const el = swipingEl; const card = swipingCard;
+    swipingEl = null; swipingCard = null;
+    el.classList.remove('swipe-right', 'swipe-left');
+    if (Math.abs(dx) < 60) return;
+    if (dx > 0 && card && !savedIds.has(card.id)) {
+      // Swipe right → save
+      openIntentSheet(card, el);
+    } else if (dx < 0) {
+      // Swipe left → dismiss
+      el.style.transition = 'opacity .25s, transform .25s';
+      el.style.opacity = '0'; el.style.transform = 'translateX(-40px)';
+      setTimeout(() => el.remove(), 280);
+    }
+  }, { passive: true });
+})();
+
+// ─────────────────────────────────────────────
+// Search
+// ─────────────────────────────────────────────
+function runSearch(q) {
+  const resultsEl = document.getElementById('search-results');
+  if (!q.trim()) { resultsEl.innerHTML = ''; return; }
+  const lower = q.toLowerCase();
+  const results = [];
+
+  // Feed cards
+  feedCards.forEach(c => {
+    const text = ((c.headline || '') + ' ' + (c.summary || '')).toLowerCase();
+    if (text.includes(lower))
+      results.push({ type: 'Article', title: c.headline, snippet: c.summary, card: c });
+  });
+  // Saved cards
+  [...savedCardsMap.values()].forEach(c => {
+    if (results.some(r => r.card?.id === c.id)) return;
+    const text = ((c.headline || '') + ' ' + (c.summary || '')).toLowerCase();
+    if (text.includes(lower))
+      results.push({ type: 'Saved', title: c.headline, snippet: c.summary, card: c });
+  });
+  // Notes
+  notesArr.forEach(n => {
+    if (n.text.toLowerCase().includes(lower))
+      results.push({ type: 'Note', title: n.text.slice(0, 80), snippet: null, note: n });
+  });
+
+  if (results.length === 0) {
+    resultsEl.innerHTML = `<div id="search-empty">No results for "${q}"</div>`;
+    return;
+  }
+  resultsEl.innerHTML = '';
+  results.slice(0, 30).forEach(r => {
+    const el = document.createElement('div');
+    el.className = 'search-result';
+    el.innerHTML = `<div class="search-result-type">${r.type}</div>
+      <div class="search-result-title">${r.title || ''}</div>
+      ${r.snippet ? `<div class="search-result-snippet">${r.snippet}</div>` : ''}`;
+    el.addEventListener('click', () => {
+      document.getElementById('search-overlay').classList.remove('open');
+      if (r.card?.url) window.open(r.card.url, '_blank', 'noopener');
+      else if (r.note) { /* switch to notes tab */ document.querySelector('[data-tab="notes"]').click(); }
+    });
+    resultsEl.appendChild(el);
+  });
+}
+
+document.getElementById('search-btn').addEventListener('click', () => {
+  document.getElementById('search-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('search-input').focus(), 100);
+});
+document.getElementById('search-cancel').addEventListener('click', () => {
+  document.getElementById('search-overlay').classList.remove('open');
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-results').innerHTML = '';
+});
+document.getElementById('search-input').addEventListener('input', e => runSearch(e.target.value));
+
+// ─────────────────────────────────────────────
+// Custom topics + language toggle (settings)
+// ─────────────────────────────────────────────
+function renderTopicChips() {
+  const container = document.getElementById('topic-chips');
+  if (!container) return;
+  container.innerHTML = '';
+  ALL_TOPICS.forEach(t => {
+    const chip = document.createElement('button');
+    chip.className = 'topic-chip' + (customTopics.includes(t) ? ' active' : '');
+    chip.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+    chip.addEventListener('click', async () => {
+      if (customTopics.includes(t)) {
+        if (customTopics.length <= 1) return; // keep at least 1
+        customTopics = customTopics.filter(x => x !== t);
+      } else {
+        customTopics = [...customTopics, t];
+      }
+      chip.classList.toggle('active', customTopics.includes(t));
+      await dbPutSetting('custom_topics', customTopics.join(','));
+    });
+    container.appendChild(chip);
+  });
+}
+
+const langToggleInput = document.getElementById('lang-toggle-input');
+if (langToggleInput) {
+  langToggleInput.addEventListener('change', async () => {
+    showPt = langToggleInput.checked;
+    await dbPutSetting('show_pt', showPt ? '1' : '0');
+  });
+}
+
+// ─────────────────────────────────────────────
+// Weekly digest
+// ─────────────────────────────────────────────
+async function checkWeeklyDigest() {
+  const today = new Date();
+  if (today.getDay() !== 1) return; // Monday only
+  const lastDigest = await dbGetSetting('last_digest_date');
+  const todayStr = today.toISOString().split('T')[0];
+  if (lastDigest === todayStr) return; // already done today
+
+  const savedArr = [...savedCardsMap.values()];
+  if (savedArr.length < 3) return;
+
+  const savedHeadlines = savedArr.map(c => c.headline).filter(Boolean);
+  const savedIntents = savedArr.map(c => c.saveTag).filter(Boolean);
+  const noteTexts = notesArr.map(n => n.text).filter(Boolean);
+
+  try {
+    const res = await fetch('/api/digest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ savedHeadlines, savedIntents, noteTexts }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.digest) return;
+
+    // Store as a special digest note
+    const note = {
+      id: `digest-${todayStr}`,
+      text: `📋 Weekly Digest — ${today.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}\n\n${data.digest}`,
+      ts: Date.now(),
+      isDigest: true,
+    };
+    notesArr = [note, ...notesArr.filter(n => n.id !== note.id)];
+    await dbPutNote(note);
+    await dbPutSetting('last_digest_date', todayStr);
+    document.getElementById('notes-count').textContent = notesArr.length;
+  } catch (err) {
+    console.warn('Weekly digest failed:', err.message);
+  }
+}
+
+// ─────────────────────────────────────────────
 // Boot
 // ─────────────────────────────────────────────
 (async () => {
   db = await openDB();
-  const [savedArr, notesFromDB, signalsFromDB, storedStyle, storedBrief, storedMindset, storedMindsetCount] = await Promise.all([
+  const [savedArr, notesFromDB, signalsFromDB, storedStyle, storedBrief, storedMindset, storedMindsetCount, storedTopics, storedPt] = await Promise.all([
     dbGetAll(),
     dbGetAllNotes(),
     dbGetAllSignals(),
@@ -2202,6 +2778,8 @@ document.getElementById('more-btn').addEventListener('click', async () => {
     dbGetSetting('interest_brief'),
     dbGetSetting('mindset_summary'),
     dbGetSetting('mindset_note_count'),
+    dbGetSetting('custom_topics'),
+    dbGetSetting('show_pt'),
   ]);
   savedArr.forEach(c => { savedIds.add(c.id); savedCardsMap.set(c.id, c); });
   notesArr = notesFromDB.sort((a, b) => b.ts - a.ts);
@@ -2210,8 +2788,12 @@ document.getElementById('more-btn').addEventListener('click', async () => {
   if (storedBrief) interestBrief = storedBrief;
   if (storedMindset) mindsetSummary = storedMindset;
   if (storedMindsetCount != null) mindsetNoteCount = storedMindsetCount;
+  if (storedTopics) customTopics = storedTopics.split(',').filter(t => ALL_TOPICS.includes(t));
+  if (storedPt === '1') { showPt = true; const li = document.getElementById('lang-toggle-input'); if (li) li.checked = true; }
+  renderTopicChips();
   updateBadges();
   await loadFeed();
+  checkWeeklyDigest().catch(() => {});
 })();
 
 // ─────────────────────────────────────────────

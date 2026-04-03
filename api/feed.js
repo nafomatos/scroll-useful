@@ -47,7 +47,7 @@ function extractSource(item) {
 }
 
 // Fetch articles for a topic. count controls how many EN items to return (PT always 1).
-async function fetchTopicArticles(topic, count = 1) {
+async function fetchTopicArticles(topic, count = 1, includePT = true) {
   const fetchMany = async (url, lang, max) => {
     try {
       const feed = await rssParser.parseURL(url);
@@ -64,6 +64,11 @@ async function fetchTopicArticles(topic, count = 1) {
       return [];
     }
   };
+
+  if (!includePT) {
+    const en = await fetchMany(rssUrlEN(topic), 'en', count);
+    return en;
+  }
 
   const [en, pt] = await Promise.all([
     fetchMany(rssUrlEN(topic), 'en', count),
@@ -289,6 +294,15 @@ module.exports = async function handler(req, res) {
   const requestedTopic = req.query && req.query.topic;
   const singleTopic = requestedTopic && TOPICS.includes(requestedTopic) ? requestedTopic : null;
 
+  // Custom topics filter
+  const topicsRaw = req.query && req.query.topics;
+  const activeTopics = topicsRaw
+    ? topicsRaw.split(',').filter(t => /^[a-z0-9 ]+$/i.test(t.trim())).map(t => t.trim()).slice(0, 15)
+    : TOPICS;
+
+  // Portuguese articles toggle
+  const includePT = req.query && req.query.pt !== '0';
+
   const prefRaw = req.query && req.query.pref;
   const preferredTopics = prefRaw
     ? prefRaw.split(',').map(t => t.trim()).filter(t => TOPICS.includes(t)).slice(0, 2)
@@ -341,8 +355,8 @@ module.exports = async function handler(req, res) {
       // ── Full feed mode ─────────────────────────────────────────────────────
       // Preferred topics get 3 EN articles; others get 1
       const [articleBatches, videoResults] = await Promise.all([
-        Promise.all(TOPICS.map(t => fetchTopicArticles(t, preferredTopics.includes(t) ? 3 : 1))),
-        Promise.all(TOPICS.map(t => fetchTopicVideo(t))),
+        Promise.all(activeTopics.map(t => fetchTopicArticles(t, preferredTopics.includes(t) ? 3 : 1, includePT))),
+        Promise.all(activeTopics.map(t => fetchTopicVideo(t))),
       ]);
       const articles = articleBatches.flat();
       if (articles.length === 0) {
@@ -359,7 +373,7 @@ module.exports = async function handler(req, res) {
       const videoByTopic = Object.fromEntries(
         videoResults.filter(Boolean).map(v => [v.topic, v])
       );
-      allItems = TOPICS.flatMap(topic => {
+      allItems = activeTopics.flatMap(topic => {
         const topicArticles = articlesRich.filter(a => a.topic === topic);
         const video = videoByTopic[topic];
         return video ? [...topicArticles, video] : topicArticles;
