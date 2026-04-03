@@ -10,6 +10,7 @@ const TOPICS = ['tech', 'startups', 'science', 'design', 'finance', 'culture', '
 const MAX_PER_TOPIC = 2;
 const MAX_TEXT_CHARS = 1500;
 const SCRAPE_TIMEOUT_MS = 7000;
+const MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
 
 // Override RSS search query for topics where the bare topic name returns poor results
 const TOPIC_QUERY = {
@@ -48,10 +49,17 @@ function extractSource(item) {
 
 // Fetch articles for a topic. count controls how many EN items to return (PT always 1).
 async function fetchTopicArticles(topic, count = 1, includePT = true) {
+  const cutoff = Date.now() - MAX_AGE_MS;
   const fetchMany = async (url, lang, max) => {
     try {
       const feed = await rssParser.parseURL(url);
-      return feed.items.slice(0, max).map(item => ({
+      const recent = feed.items.filter(item => {
+        const d = item.pubDate || item.isoDate;
+        if (!d) return true; // keep if no date info
+        const t = new Date(d).getTime();
+        return isNaN(t) || t > cutoff;
+      });
+      return recent.slice(0, max).map(item => ({
         topic,
         lang,
         headline: cleanHeadline(item.title),
@@ -82,6 +90,7 @@ async function fetchTopicVideo(topic) {
   const key = process.env.YOUTUBE_API_KEY;
   if (!key) return null;
   try {
+    const publishedAfter = new Date(Date.now() - MAX_AGE_MS).toISOString();
     const qs = new URLSearchParams({
       part: 'snippet',
       q: topic,
@@ -89,6 +98,7 @@ async function fetchTopicVideo(topic) {
       maxResults: '1',
       relevanceLanguage: 'en',
       order: 'relevance',
+      publishedAfter,
       key,
     });
     const res = await fetch(`https://www.googleapis.com/youtube/v3/search?${qs}`, {
@@ -238,7 +248,7 @@ async function summariseAll(articles, style = 'direct', seenHeadlines = [], inte
 
 STYLE: ${styleNote}${interestSection}${mindsetSection}
 
-Also write a "daily_brief" — 3 to 4 sentences written like an insightful morning editorial. Don't just list headlines. Connect the dots between topics, surface the tension or irony between stories, give the reader a sense of what's really happening across the day. Be conversational and specific.${seenSection}
+Also write a "daily_brief" — 2 to 3 punchy sentences as a morning editorial. Use 2–3 relevant emojis woven in naturally (not forced at the start of every sentence). Don't list headlines. Connect the dots between topics, surface the tension or irony, give a vivid sense of what's happening today. Be sharp and specific.${seenSection}
 
 Return ONLY a valid JSON object — no markdown fences — in this exact shape:
 {"daily_brief":"...","summaries":[{"id":0,"summary":"...","duplicate":false},{"id":1,"summary":"...","duplicate":false},...]}

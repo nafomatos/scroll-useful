@@ -64,7 +64,7 @@ module.exports = async function handler(req, res) {
 
   const apiKey = process.env.FOOTBALL_API_KEY;
   if (!apiKey) {
-    return res.status(200).json({ fixtures: [], date: null });
+    return res.status(200).json({ fixtures: [], date: null, keyMissing: true });
   }
 
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD

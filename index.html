@@ -426,36 +426,53 @@
     /* ── Carta do Momento ──────────────────────── */
     #carta {
       margin-bottom: 20px;
-      padding: 14px 16px;
-      border-left: 3px solid rgba(255,255,255,.18);
-      background: rgba(255,255,255,.025);
-      border-radius: 0 12px 12px 0;
+      padding: 16px 18px 18px;
+      background: linear-gradient(135deg, rgba(96,165,250,.08) 0%, rgba(167,139,250,.06) 100%);
+      border: 1px solid rgba(96,165,250,.18);
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    #carta::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at top left, rgba(96,165,250,.07) 0%, transparent 60%);
+      pointer-events: none;
     }
     #carta.hidden { display: none; }
     #carta-label {
-      font-size: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
       font-weight: 700;
-      letter-spacing: .12em;
+      letter-spacing: .08em;
       text-transform: uppercase;
-      color: #555;
-      margin-bottom: 8px;
+      color: rgba(96,165,250,.7);
+      margin-bottom: 10px;
+    }
+    #carta-label-icon {
+      font-size: 14px;
+      line-height: 1;
     }
     #carta-text {
-      font-size: 13.5px;
-      line-height: 1.7;
-      color: #bbb;
-      font-style: italic;
+      font-size: 14px;
+      line-height: 1.75;
+      color: #d4d4d4;
+      font-style: normal;
+      font-weight: 400;
     }
     #carta-read-more {
       display: inline;
-      color: #666;
+      color: rgba(96,165,250,.6);
       font-style: normal;
       font-size: 12px;
       cursor: pointer;
       white-space: nowrap;
-      border-bottom: 1px solid #444;
+      border-bottom: 1px solid rgba(96,165,250,.25);
     }
-    #carta-read-more:hover { color: #999; }
+    #carta-read-more:hover { color: rgba(96,165,250,.9); }
 
     /* ── Save tag pill + note ──────────────────── */
     .save-tag {
@@ -1363,7 +1380,7 @@
 
 <div id="feed-page" class="feed-page">
   <div id="carta" class="hidden">
-    <div id="carta-label">Carta do Momento</div>
+    <div id="carta-label"><span id="carta-label-icon">🌅</span> Morning Brief</div>
     <p id="carta-text"></p>
   </div>
   <!-- cards rendered here -->
@@ -1751,7 +1768,7 @@ function renderFeedPage(cards, dailyBrief) {
   // Preserve #carta element across innerHTML wipes
   const cartaEl = document.getElementById('carta') || (() => {
     const d = document.createElement('div'); d.id = 'carta'; d.className = 'hidden';
-    d.innerHTML = '<div id="carta-label">Carta do Momento</div><p id="carta-text"></p>';
+    d.innerHTML = '<div id="carta-label"><span id="carta-label-icon">🌅</span> Morning Brief</div><p id="carta-text"></p>';
     return d;
   })();
   page.innerHTML = '';
@@ -2347,7 +2364,17 @@ async function loadFixtures(targetPage) {
     if (!res.ok) return;
     const data = await res.json();
     const fixtures = data.fixtures || [];
-    if (fixtures.length === 0) return;
+    if (fixtures.length === 0) {
+      const msg = data.keyMissing
+        ? '⚙️ Add a FOOTBALL_API_KEY to Vercel to see live fixtures.'
+        : '⚽ No fixtures scheduled today for your tracked leagues.';
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.style.cssText = 'padding:32px 16px;text-align:center;color:#555;font-size:14px;';
+      empty.textContent = msg;
+      page.appendChild(empty);
+      return;
+    }
 
     // Group by league, preserving sort order
     const leagueMap = new Map();
