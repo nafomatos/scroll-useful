@@ -32,6 +32,7 @@
     .tag-finance   { --tc:#22d3ee; --tb:rgba(34,211,238,.12); }
     .tag-culture   { --tc:#fb7185; --tb:rgba(251,113,133,.12); }
     .tag-sports    { --tc:#a3e635; --tb:rgba(163,230,53,.12); }
+    .tag-search    { --tc:#c084fc; --tb:rgba(192,132,252,.12); }
 
     html { background: var(--bg); }
 
@@ -1034,6 +1035,17 @@
       letter-spacing: .05em;
       text-transform: uppercase;
       color: #666;
+      flex: 1;
+    }
+    .fixture-day-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 20px;
+      background: rgba(255,255,255,.06);
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: .04em;
     }
     .fixture-row {
       display: flex;
@@ -1174,25 +1186,31 @@
     }
     .trend-chip:active { background: #1f1f23; color: var(--text); }
 
-    /* ── Ask the feed ────────────────────────────── */
-    #ask-bar { display: flex; gap: 8px; margin-bottom: 14px; }
+    /* ── Live search bar ────────────────────────── */
+    #ask-bar {
+      display: flex; gap: 0; margin-bottom: 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; overflow: hidden; transition: border-color .2s;
+    }
+    #ask-bar:focus-within { border-color: #3a3a3e; }
     #ask-input {
-      flex: 1; background: var(--surface); border: 1px solid var(--border);
-      border-radius: 12px; padding: 10px 14px;
+      flex: 1; background: transparent; border: none;
+      padding: 11px 14px;
       color: var(--text); font-size: 14px; font-family: inherit; outline: none;
     }
-    #ask-input:focus { border-color: #3a3a3e; }
     #ask-input::placeholder { color: #444; }
     #ask-btn {
-      padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border);
-      background: var(--surface); color: var(--muted); font-size: 13px;
+      padding: 8px 14px; border-radius: 0; border: none; border-left: 1px solid var(--border);
+      background: transparent; color: var(--muted); font-size: 13px;
       font-weight: 600; cursor: pointer; white-space: nowrap; transition: color .2s, background .2s;
+      display: flex; align-items: center; gap: 5px;
     }
+    #ask-btn:hover:not(:disabled) { background: rgba(255,255,255,.04); color: var(--text); }
     #ask-btn:disabled { opacity: .4; cursor: default; }
     #ask-answer {
       margin-bottom: 14px; padding: 12px 14px;
-      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
-      border-radius: 12px; font-size: 13.5px; line-height: 1.65; color: #bbb; display: none;
+      background: rgba(96,165,250,.06); border: 1px solid rgba(96,165,250,.15);
+      border-radius: 12px; font-size: 13.5px; line-height: 1.65; color: #ccc; display: none;
     }
     #ask-answer.visible { display: block; }
 
@@ -1808,16 +1826,16 @@ function renderFeedPage(cards, dailyBrief) {
   const trendEl = buildTrendingStrip(feedOnly.flatMap(x => x._isCluster ? x.cards : [x]));
   if (trendEl) page.appendChild(trendEl);
 
-  // Ask the feed bar
+  // Live news search bar
   const askBar = document.createElement('div');
   askBar.id = 'ask-bar';
-  askBar.innerHTML = `<input id="ask-input" type="text" placeholder="Ask about today's news…"><button id="ask-btn">Ask</button>`;
+  askBar.innerHTML = `<input id="ask-input" type="search" placeholder="🔍 Search any topic or news…" autocomplete="off"><button id="ask-btn"><span id="ask-btn-icon">↵</span> Search</button>`;
   page.appendChild(askBar);
   const askAnswer = document.createElement('div');
   askAnswer.id = 'ask-answer';
   page.appendChild(askAnswer);
-  document.getElementById('ask-btn').addEventListener('click', handleAskFeed);
-  document.getElementById('ask-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleAskFeed(); });
+  document.getElementById('ask-btn').addEventListener('click', handleLiveSearch);
+  document.getElementById('ask-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleLiveSearch(); });
 
   let cardCount = 0;
   feedOnly.forEach((item, i) => {
@@ -2348,8 +2366,12 @@ function buildLeagueFixtureBlock(leagueName, leagueLogo, fixtures) {
       </div>`;
   }).join('');
 
+  const dayBadge = fixtures[0]?.dayLabel && fixtures[0].dayLabel !== 'Today'
+    ? `<span class="fixture-day-badge">${fixtures[0].dayLabel}</span>`
+    : '';
+
   el.innerHTML = `
-    <div class="fixture-block-header">${headerLogo}<span class="fixture-block-league-name">${leagueName}</span></div>
+    <div class="fixture-block-header">${headerLogo}<span class="fixture-block-league-name">${leagueName}</span>${dayBadge}</div>
     ${rows}
   `;
 
@@ -2508,11 +2530,13 @@ document.getElementById('more-btn').addEventListener('click', async () => {
       const el = buildCard(c);
       el.style.transitionDelay = `${i * 50}ms`;
       page.insertBefore(el, endEl);
-      // Trigger animation on next frame
-      requestAnimationFrame(() => requestAnimationFrame(() => io.observe(el)));
+      io.observe(el);
     });
 
     document.getElementById('feed-count').textContent = feedCards.length;
+
+    // Scroll to the divider so user can see the new cards
+    divider.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (err) {
     console.error('load more error:', err);
   } finally {
@@ -2556,33 +2580,67 @@ function clusterFeedCards(cards) {
 }
 
 // ─────────────────────────────────────────────
-// Ask the feed
+// Live news search
 // ─────────────────────────────────────────────
-async function handleAskFeed() {
+async function handleLiveSearch() {
   const input = document.getElementById('ask-input');
   const btn = document.getElementById('ask-btn');
   const answer = document.getElementById('ask-answer');
   const q = (input?.value || '').trim();
   if (!q || !btn || !answer) return;
+
   btn.disabled = true;
-  btn.textContent = '…';
+  btn.innerHTML = '<span style="opacity:.5">Searching…</span>';
+  answer.style.display = 'none';
   answer.classList.remove('visible');
+
+  // Remove any previous search result cards
+  document.querySelectorAll('.search-result-card, .search-results-divider').forEach(el => el.remove());
+
   try {
-    const context = feedCards.slice(0, 20).map(c => `${c.headline}: ${c.summary || ''}`).join('\n');
-    const res = await fetch('/api/ask', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: q, context }),
-    });
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
     const data = await res.json();
-    answer.textContent = data.answer || 'No answer.';
-    answer.classList.add('visible');
-  } catch (err) {
-    answer.textContent = 'Could not get an answer right now.';
+
+    // Show Claude's answer summary
+    if (data.answer) {
+      answer.textContent = data.answer;
+      answer.style.display = 'block';
+      answer.classList.add('visible');
+    }
+
+    // Inject result cards into the feed page above the feed cards
+    if (data.cards && data.cards.length > 0) {
+      const page = document.getElementById('feed-page');
+      const askBarEl = document.getElementById('ask-bar');
+      const answerEl = document.getElementById('ask-answer');
+      const insertAfter = answerEl.style.display !== 'none' ? answerEl : askBarEl;
+
+      const divider = document.createElement('div');
+      divider.className = 'search-results-divider more-divider';
+      divider.textContent = `Results: "${q}"`;
+      insertAfter.insertAdjacentElement('afterend', divider);
+
+      let refEl = divider;
+      data.cards.forEach((c, i) => {
+        c.topic = 'search'; // purple tag
+        const el = buildCard(c);
+        el.classList.add('search-result-card');
+        el.style.transitionDelay = `${i * 40}ms`;
+        refEl.insertAdjacentElement('afterend', el);
+        refEl = el;
+        requestAnimationFrame(() => requestAnimationFrame(() => io.observe(el)));
+      });
+
+      // Scroll to show the answer / first result
+      answer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  } catch {
+    answer.textContent = 'Search failed. Please try again.';
+    answer.style.display = 'block';
     answer.classList.add('visible');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Ask';
+    btn.innerHTML = '<span id="ask-btn-icon">↵</span> Search';
   }
 }
 

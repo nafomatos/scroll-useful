@@ -4,6 +4,7 @@
   "framework": null,
   "functions": {
     "api/feed.js":        { "maxDuration": 60 },
+    "api/search.js":      { "maxDuration": 45 },
     "api/ask.js":         { "maxDuration": 30 },
     "api/digest.js":      { "maxDuration": 30 },
     "api/mindset.js":     { "maxDuration": 30 },

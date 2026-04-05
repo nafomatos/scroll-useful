@@ -1,4 +1,5 @@
-// api/sports.js — Today's football fixtures from API-Sports (v3.football.api-sports.io)
+// api/sports.js — Football fixtures from API-Sports (v3.football.api-sports.io)
+// Fetches yesterday + today + tomorrow to handle timezones and recently played games
 const BASE = 'https://v3.football.api-sports.io';
 
 const LEAGUE_IDS = [39, 2, 71, 13, 135, 9, 140, 10];
@@ -35,6 +36,12 @@ function formatKickoff(dateStr) {
   } catch { return ''; }
 }
 
+function isoDate(offsetDays = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().split('T')[0];
+}
+
 async function fetchFixtures(params, apiKey) {
   const qs = new URLSearchParams(params);
   try {
@@ -67,12 +74,15 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ fixtures: [], date: null, keyMissing: true });
   }
 
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const yesterday = isoDate(-1);
+  const today     = isoDate(0);
+  const tomorrow  = isoDate(1);
+  const dates = [yesterday, today, tomorrow];
 
-  // Fetch leagues + teams in parallel; no season param — API resolves from date
+  // Fetch all leagues + team-specific fixtures across 3 days in parallel
   const allSettled = await Promise.allSettled([
-    ...LEAGUE_IDS.map(id => fetchFixtures({ date: today, league: id }, apiKey)),
-    ...TEAM_IDS.map(id  => fetchFixtures({ date: today, team: id  }, apiKey)),
+    ...dates.flatMap(date => LEAGUE_IDS.map(id => fetchFixtures({ date, league: id }, apiKey))),
+    ...dates.flatMap(date => TEAM_IDS.map(id  => fetchFixtures({ date, team: id  }, apiKey))),
   ]);
 
   const raw = allSettled.flatMap(r => r.status === 'fulfilled' ? r.value : []);
@@ -88,6 +98,13 @@ module.exports = async function handler(req, res) {
 
   const fixtures = unique.map(f => {
     const { status, elapsed } = parseStatus(f);
+    const kickoffRaw = f.fixture?.date || null;
+    // Determine which day bucket this fixture belongs to
+    const fixtureDate = kickoffRaw ? kickoffRaw.split('T')[0] : today;
+    let dayLabel = 'Today';
+    if (fixtureDate === yesterday) dayLabel = 'Yesterday';
+    else if (fixtureDate === tomorrow) dayLabel = 'Tomorrow';
+
     return {
       id:          `fixture-${f.fixture.id}`,
       type:        'fixture',
@@ -102,12 +119,13 @@ module.exports = async function handler(req, res) {
       awayScore:   f.goals?.away ?? null,
       status,
       elapsed,
-      kickoff:     formatKickoff(f.fixture?.date),
-      kickoffRaw:  f.fixture?.date || null,
+      kickoff:     formatKickoff(kickoffRaw),
+      kickoffRaw,
+      dayLabel,
     };
   });
 
-  // Sort: live → upcoming (chronological) → postponed → finished
+  // Sort: live → upcoming (chronological) → postponed → finished; within same status sort by date
   const ORDER = { live: 0, upcoming: 1, postponed: 2, finished: 3 };
   fixtures.sort((a, b) => {
     const d = (ORDER[a.status] ?? 4) - (ORDER[b.status] ?? 4);
